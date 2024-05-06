@@ -1,0 +1,39 @@
+- Swerve
+    - 4x Module
+        - 1x Drive: Kraken
+        - 1x Azimith: Kraken
+        - 1x Cancoder 1:1
+        - Drive Ratio: 5.82:1
+        - Azimuth Ratio: 150/7:1
+- Intake
+    - 1x Deploy: Kraken
+        - Ratio: 45:1
+    - 1x Roller: Kraken
+- Serializer
+    - 1x Kraken
+    - 1x Photoeye
+    - Ratio: 1:1
+- Feeder
+    - 1x Kraken
+    - 1x Photoeye
+    - Ratio: 1:1
+- AmpRoller
+    - 1x Kraken
+    - 1x Photoeye
+- Elevator
+    - 2x Kraken
+    - Ratio: 9:1
+- Shooter
+    - 1x Top Wheels: Kraken
+    - 1x Bottom Wheels: Kraken
+    - Ratio: 1.6:1
+- Hood
+    - 1x Kraken
+    - Cancoder Ratio: 314:1
+- Climber
+    - 2x Kraken
+    - Ratio: 8:(0.655*3.14)
+
+
+
+
