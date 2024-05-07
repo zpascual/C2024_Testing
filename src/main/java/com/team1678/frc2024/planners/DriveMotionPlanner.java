@@ -9,8 +9,6 @@ import com.team1678.frc2024.RobotState;
 import com.team1678.lib.control.ErrorTracker;
 import com.team1678.lib.control.Lookahead;
 import com.team1678.lib.mechanisms.swerve.ChassisSpeeds;
-import com.team1678.lib.mechanisms.swerve.SwerveDriveKinematics;
-import com.team1678.lib.mechanisms.swerve.SwerveKinematicLimits;
 import com.team254.lib.geometry.Pose2d;
 import com.team254.lib.geometry.Pose2dWithMotion;
 import com.team254.lib.geometry.Rotation2d;
@@ -20,9 +18,7 @@ import com.team254.lib.trajectory.DistanceView;
 import com.team254.lib.trajectory.Trajectory;
 import com.team254.lib.trajectory.TrajectoryIterator;
 import com.team254.lib.trajectory.TrajectorySamplePoint;
-import com.team254.lib.trajectory.TrajectoryUtil;
 import com.team254.lib.trajectory.timing.CentripetalAccelerationConstraint;
-import com.team254.lib.trajectory.timing.SwerveDriveDynamicsConstraint;
 import com.team254.lib.trajectory.timing.TimedState;
 import com.team254.lib.trajectory.timing.TimingConstraint;
 import com.team254.lib.trajectory.timing.TimingUtil;
@@ -127,81 +123,6 @@ public class DriveMotionPlanner implements CSVWritable {
         mLastSetpoint = null;
         mOutput = new ChassisSpeeds();
         mLastTime = Double.POSITIVE_INFINITY;
-    }
-
-    public Trajectory<TimedState<Pose2dWithMotion>> generateTrajectory(
-            boolean reversed,
-            final List<Pose2d> waypoints,
-            final List<Rotation2d> headings,
-            final List<TimingConstraint<Pose2dWithMotion>> constraints,
-            double max_vel, // m/s
-            double max_accel, // m/s^2
-            double max_decel, // m/s^2
-            double max_voltage,
-            double default_vel,
-            int slowdown_chunks) {
-        return generateTrajectory(reversed, waypoints, headings, constraints, 0.0, 0.0, max_vel, max_accel, max_decel, max_voltage, default_vel, slowdown_chunks);
-    }
-
-    public Trajectory<TimedState<Pose2dWithMotion>> generateTrajectory(
-            boolean reversed,
-            final List<Pose2d> waypoints,
-            final List<Rotation2d> headings,
-            final List<TimingConstraint<Pose2dWithMotion>> constraints,
-            double start_vel,
-            double end_vel,
-            double max_vel,  // m/s
-            double max_accel,  // m/s^2
-            double max_decel,
-            double max_voltage,
-            double default_vel,
-            int slowdown_chunks) {
-        List<Pose2d> waypoints_maybe_flipped = waypoints;
-        List<Rotation2d> headings_maybe_flipped = headings;
-        final Pose2d flip = Pose2d.fromRotation(new Rotation2d(-1, 0, false));
-        if (reversed) {
-            waypoints_maybe_flipped = new ArrayList<>(waypoints.size());
-            headings_maybe_flipped = new ArrayList<>(headings.size());
-            for (int i = 0; i < waypoints.size(); ++i) {
-                waypoints_maybe_flipped.add(waypoints.get(i).transformBy(flip));
-                headings_maybe_flipped.add(headings.get(i).rotateBy(flip.getRotation()));
-            }
-        }
-
-        // Create a trajectory from splines.
-        Trajectory<Pose2dWithMotion> trajectory = TrajectoryUtil.trajectoryFromWaypointsAndHeadings(
-                waypoints_maybe_flipped, headings_maybe_flipped, kMaxDx, kMaxDy, kMaxDTheta);
-
-        if (reversed) {
-            List<Pose2dWithMotion> flipped_points = new ArrayList<>(trajectory.length());
-            for (int i = 0; i < trajectory.length(); ++i) {
-                flipped_points.add(new Pose2dWithMotion(trajectory.getPoint(i).state().getPose().transformBy(flip), -trajectory
-                        .getPoint(i).state().getCurvature(), trajectory.getPoint(i).state().getDCurvatureDs()));
-            }
-            trajectory = new Trajectory<>(flipped_points);
-        }
-
-        // Create the constraint that the robot must be able to traverse the trajectory without ever applying more
-        // than the specified voltage.
-
-        final double kMaxYawRateRadS = 3.0;
-        final YawRateConstraint yaw_constraint = new YawRateConstraint(kMaxYawRateRadS);
-        final double kMaxCentripetalAccel = 10.0;//1.524;  // m/s^2
-        final CentripetalAccelerationConstraint centripetal_accel_constraint = new CentripetalAccelerationConstraint(kMaxCentripetalAccel);
-
-        List<TimingConstraint<Pose2dWithMotion>> all_constraints = new ArrayList<>();
-        all_constraints.add(yaw_constraint);
-        all_constraints.add(centripetal_accel_constraint);
-        if (constraints != null) {
-            all_constraints.addAll(constraints);
-        }
-
-        // Generate the timed trajectory.
-        Trajectory<TimedState<Pose2dWithMotion>> timed_trajectory = TimingUtil.timeParameterizeTrajectory
-                (reversed, new
-                        DistanceView<>(trajectory), kMaxDx, all_constraints, start_vel, end_vel, max_vel, max_accel, max_decel, slowdown_chunks);
-        timed_trajectory.setDefaultVelocity(default_vel / Constants.SwerveConfig.kMaxLinearVelocity);
-        return timed_trajectory;
     }
 
     @Override

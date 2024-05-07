@@ -1,6 +1,5 @@
 package com.team1678.frc2024;
 
-import com.team1678.lib.filters.UnscentedKalmanFilter;
 import com.team254.lib.geometry.Pose2d;
 import com.team254.lib.geometry.Translation2d;
 import com.team254.lib.geometry.Twist2d;
@@ -23,7 +22,7 @@ import java.util.Optional;
 public class RobotState {
     private static RobotState mInstance;
     //private Optional<VisionUpdate> mLatestVisionUpdate;
-    private UnscentedKalmanFilter<N2, N2, N2> mKalmanFilter;
+    //private UnscentedKalmanFilter<N2, N2, N2> mKalmanFilter;
     //private VisionPoseAcceptor mPoseAcceptor;
     private Pose2d mDisplayVisionPose;
     private Pose2d mSetpointPose;
@@ -100,7 +99,7 @@ public class RobotState {
         //mPoseAcceptor = new VisionPoseAcceptor();
 
         mField2d = new Field2d();
-        mField2d.setRobotPose(Constants.kWidthField2d, Constants.kHeightField2d, new edu.wpi.first.math.geometry.Rotation2d(0));
+        //mField2d.setRobotPose(Constants.kWidthField2d, Constants.kHeightField2d, new edu.wpi.first.math.geometry.Rotation2d(0));
         //mField2d.getObject("vision").setPose(Constants.kWidthField2d, Constants.kHeightField2d, new edu.wpi.first.math.geometry.Rotation2d(0));
         //mField2d.getObject("fused").setPose(Constants.kWidthField2d, Constants.kHeightField2d, new edu.wpi.first.math.geometry.Rotation2d(0));
     }
@@ -109,6 +108,7 @@ public class RobotState {
         reset(Timer.getFPGATimestamp(), Pose2d.identity());
     }
 
+    /*
     public synchronized void resetKalmanFilters() {
         mKalmanFilter =
         new UnscentedKalmanFilter<>(
@@ -120,6 +120,7 @@ public class RobotState {
             Constants.kLocalMeasurementStdDevs, Constants.kLooperDt);
 
     }
+    */
 
     public synchronized boolean getHasBeenEnabled() {
         return mHasBeenEnabled;
@@ -152,7 +153,7 @@ public class RobotState {
 
     public synchronized void addOdomObservations(double timestamp, Pose2d odom_to_robot, Twist2d measured_velocity, Twist2d predicted_velocity) {
         try {
-            mKalmanFilter.predict(VecBuilder.fill(0.0, 0.0), Constants.kLooperDt);
+           // mKalmanFilter.predict(VecBuilder.fill(0.0, 0.0), Constants.kLooperDt);
         } catch (Exception e) {
             DriverStation.reportError("QR Decomposition failed: ", e.getStackTrace());
         }
@@ -236,7 +237,7 @@ public class RobotState {
 
     public synchronized Pose2d getDisplayVisionPose() {
         if (mDisplayVisionPose == null) {
-            return Pose2d.fromTranslation(new Translation2d(Constants.kOutofFrameValue, Constants.kOutofFrameValue)); //Out of frame
+            //return Pose2d.fromTranslation(new Translation2d(Constants.kOutofFrameValue, Constants.kOutofFrameValue)); //Out of frame
         }
         return mDisplayVisionPose;
     }
@@ -332,9 +333,11 @@ public class RobotState {
             mField2d.getObject("fused").setPose(fusedPose.getTranslation().x(), fusedPose.getTranslation().y(), new edu.wpi.first.math.geometry.Rotation2d(fusedPose.getRotation().getRadians()));
             mField2d.getObject("setpoint").setPose(setpointPose.getTranslation().x(), setpointPose.getTranslation().y(), new edu.wpi.first.math.geometry.Rotation2d(setpointPose.getRotation().getRadians()));
         } else {
+            /*
             mField2d.getObject("vision").setPose(Constants.kWidthField2d - displayVisionPose.getTranslation().x(), Constants.kHeightField2d - displayVisionPose.getTranslation().y(), new edu.wpi.first.math.geometry.Rotation2d(displayVisionPose.getRotation().getRadians() + Math.PI));
             mField2d.getObject("fused").setPose(Constants.kWidthField2d - fusedPose.getTranslation().x(), Constants.kHeightField2d - fusedPose.getTranslation().y(), new edu.wpi.first.math.geometry.Rotation2d(fusedPose.getRotation().getRadians() + Math.PI));
             mField2d.getObject("setpoint").setPose(Constants.kWidthField2d - setpointPose.getTranslation().x(), Constants.kHeightField2d - setpointPose.getTranslation().y(), new edu.wpi.first.math.geometry.Rotation2d(setpointPose.getRotation().getRadians() + Math.PI));
+             */
         }
         SmartDashboard.putData("field", mField2d);
     }

@@ -8,6 +8,4 @@ public class AutoModeSelector {
         TEST_PATH
     }
 
-    private Optional<Au>
-
 }

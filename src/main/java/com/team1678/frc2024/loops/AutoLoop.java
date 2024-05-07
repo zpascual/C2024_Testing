@@ -12,7 +12,7 @@ public class AutoLoop implements Loop {
     }
 
     @Override
-    public void onStop() {
+    public void onStop(double timestamp) {
 
     }
 }
