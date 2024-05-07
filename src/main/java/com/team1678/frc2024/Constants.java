@@ -77,4 +77,12 @@ public class Constants {
         );
     }
 
+    public static class PurePursuit {
+        public static final double kPathLookaheadTime = 0.25; //seconds
+        public static final double kPathMinLookaheadDistance = 12.0; //From 1323 (2019)
+        public static final double kAdaptivePathMinLookaheadDistance = 6.0;
+        public static final double kAdaptivePathMaxLookaheadDistance = 24.0;
+        public static final double kAdaptiveErrorLookaheadCoefficient = 4.0;
+    }
+
 }
