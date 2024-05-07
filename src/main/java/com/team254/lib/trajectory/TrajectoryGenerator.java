@@ -22,11 +22,16 @@ public class TrajectoryGenerator {
     private static final double kMaxAccel = Constants.SwerveConfig.kMaxLinearAccel * 0.8;
     private static final double kMaxVoltage = 9.0;
 
+    private static final TrajectoryGenerator mInstance = new TrajectoryGenerator();
+    public static TrajectoryGenerator getInstance() {
+        return mInstance;
+    }
+
     private final DriveMotionPlanner mMotionPlanner;
     private TrajectorySet mTrajectorySet = null;
 
-    public TrajectoryGenerator(DriveMotionPlanner motion_planner) {
-        mMotionPlanner = motion_planner;
+    public TrajectoryGenerator() {
+        this.mMotionPlanner = new DriveMotionPlanner();
     }
 
     public void generateTrajectories() {
@@ -52,23 +57,45 @@ public class TrajectoryGenerator {
             final List<Pose2d> waypoints,
             final List<Rotation2d> headings,
             final List<TimingConstraint<Pose2dWithMotion>> constraints,
-            double max_vel,  // m/s
-            double max_accel,  // m/s^2
-            double max_voltage) {
-        return mMotionPlanner.generateTrajectory(reversed, waypoints, headings, constraints, max_vel, max_accel, max_voltage);
+            double max_vel, // m/s
+            double max_accel, // m/s^2
+            double max_decel, // m/s^2
+            double max_voltage,
+            double default_vel, // m/s
+            int slowdown_chunks) {
+        return mMotionPlanner.generateTrajectory(reversed, waypoints, headings, constraints, max_vel, max_accel, max_decel, max_voltage, default_vel, slowdown_chunks);
     }
 
+    /**
+     * Generates a trajectory from given waypoints using quintic hermite splines.
+     * @param reversed Boolean to reverse the path
+     * @param waypoints List of poses containing the x, y values of each wanted pose and heading of the path
+     * @param headings List of rotations for the robot
+     * @param constraints List of constraints the path generation will try to adhere to prevent the robot from doing undesired motions
+     * @param start_vel Desired speed in m/s
+     * @param end_vel Desired end speed in m/s
+     * @param max_vel Desired max velocity in m/s. Path might never achieve this setpoint, but will use it as a limiter
+     * @param max_accel Desired max acceleration in m/s^2
+     * @param max_decel Desired max deceleration in m/s^2
+     * @param max_voltage Desired max voltage for the drive motors to be commanded
+     * @param default_vel Velocity to get back onto path if the error is too high; a way to override default cook velocity
+     * @param slowdown_chunks Ranges from (0-1); Percent of when the max_decel effects the path generation. Default: 1
+     * @return Ordered poses with timestamps for the robot to follow
+     */
     public Trajectory<TimedState<Pose2dWithMotion>> generateTrajectory(
             boolean reversed,
             final List<Pose2d> waypoints,
             final List<Rotation2d> headings,
             final List<TimingConstraint<Pose2dWithMotion>> constraints,
-            double start_vel,  // m/s
-            double end_vel,  // m/s
-            double max_vel,  // m/s
-            double max_accel,  // m/s^2
-            double max_voltage) {
-        return mMotionPlanner.generateTrajectory(reversed, waypoints, headings, constraints, start_vel, end_vel, max_vel, max_accel, max_voltage);
+            double start_vel, // m/s
+            double end_vel, // m/s
+            double max_vel, // m/s
+            double max_accel, // m/s^2
+            double max_decel, // m/s^2
+            double max_voltage,
+            double default_vel,
+            int slowdown_chunks) {
+        return mMotionPlanner.generateTrajectory(reversed, waypoints, headings, constraints, start_vel, end_vel, max_vel, max_accel, max_decel, max_voltage, default_vel, slowdown_chunks);
     }
 
     public class TrajectorySet {
@@ -76,7 +103,7 @@ public class TrajectoryGenerator {
         public final Trajectory<TimedState<Pose2dWithMotion>> testTrajectory2;
 
 
-        private List<Trajectory<TimedState<Pose2dWithMotion>>> allTrajectories;
+        private final List<Trajectory<TimedState<Pose2dWithMotion>>> allTrajectories;
 
         public List<Trajectory<TimedState<Pose2dWithMotion>>> getAllTrajectories() {
             return allTrajectories;
@@ -88,19 +115,6 @@ public class TrajectoryGenerator {
             allTrajectories.add(testTrajectory);
             testTrajectory2 = getTestTrajectory2();
             allTrajectories.add(testTrajectory2);
-        }
-
-        private void convertToM(List<Pose2d> waypoints, List<Rotation2d> headings) {
-            for (int i = 0; i < waypoints.size(); ++i) {
-                System.out.println("waypoints.add(new Pose2d(" + Units.inchesToMeters(waypoints.get(i).getTranslation().x())
-                        + ", " + Units.inchesToMeters(waypoints.get(i).getTranslation().y())
-                        + ", Rotation2d.fromDegrees(" + waypoints.get(i).getRotation().getDegrees()
-                        + ")));");
-                System.out.println("headings.add(Rotation2d.fromDegrees("
-                + headings.get(i).getDegrees()+"));");
-            }
-            System.out.println("\n\n");
-
         }
 
         private Trajectory<TimedState<Pose2dWithMotion>> getTestTrajectory() {
@@ -127,11 +141,11 @@ public class TrajectoryGenerator {
             return generate(waypoints, headings, List.of(), false, 0.3, 1.0);
         }
 
-        private Trajectory<TimedState<Pose2dWithMotion>> generate(List<Pose2d> waypoints, List<Rotation2d> headings, List<TimingConstraint<Pose2dWithMotion>> constraints, boolean reversed, double percentSpeed, double percentAccel) {
+        private Trajectory<TimedState<Pose2dWithMotion>> generate(List<Pose2d> waypoints, List<Rotation2d> headings, List<TimingConstraint<Pose2dWithMotion>> constraints, boolean reversed, double percentSpeed, double percentAccel, double percentDecel) {
             handleAllianceFlip(waypoints, headings);
 
             return generateTrajectory(reversed, waypoints, headings, constraints,
-                    percentSpeed * Constants.SwerveConfig.kMaxLinearVelocity, percentAccel * kMaxAccel, kMaxVoltage);
+                    percentSpeed * Constants.SwerveConfig.kMaxLinearVelocity, percentAccel * kMaxAccel, percentDecel * kMaxAccel, kMaxVoltage, Constants.SwerveConfig.kMaxLinearVelocity * 0.5, 1);
         }
 
 

@@ -1,9 +1,8 @@
 package com.team1678.lib.mechanisms.swerve;
 
-import com.team254.frc2023.Constants;
-import com.team254.frc2023.RobotState;
-import com.team254.lib.control.RadiusController;
-import com.team254.lib.control.SwerveHeadingController;
+import com.team1678.frc2024.RobotState;
+import com.team1678.lib.control.RadiusController;
+import com.team1678.lib.control.SwerveHeadingController;
 import com.team254.lib.geometry.Pose2d;
 
 public class TargetLockedFieldRelativeController implements IDriveController {
@@ -11,7 +10,7 @@ public class TargetLockedFieldRelativeController implements IDriveController {
     public SwerveHeadingController mSwerveHeadingController = SwerveHeadingController.getInstance();
     public RadiusController mRadiusController = RadiusController.getInstance();
 
-    private RobotState mRobotState = RobotState.getInstance();
+    private final RobotState mRobotState = RobotState.getInstance();
 
     public static TargetLockedFieldRelativeController getInstance() {
         if (mInstance == null) {

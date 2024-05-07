@@ -1,8 +1,5 @@
 package com.team1678.lib.mechanisms.swerve;
 
-import com.team254.frc2023.Constants;
-import com.team254.lib.control.RadiusController;
-import com.team254.lib.control.SwerveHeadingController;
 import com.team254.lib.geometry.Pose2d;
 
 public class HeadingLockedFieldRelativeController implements IDriveController {

@@ -153,9 +153,6 @@ public class SwerveDriveOdometry {
         }
         average = average / 4.0;
 
-        //System.out.println(chassisState);
-        //SmartDashboard.putNumber("average", average);
-
         var newPose =
                 Pose2d.exp(
                         new Twist2d(

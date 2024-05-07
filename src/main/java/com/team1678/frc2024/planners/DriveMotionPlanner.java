@@ -35,41 +35,44 @@ public class DriveMotionPlanner implements CSVWritable {
     private static final double kMaxDx = 0.0127; // m
     private static final double kMaxDy = 0.0127; // m
     private static final double kMaxDTheta = Math.toRadians(1.0);
+    private boolean useDefaultCook = true;
 
     public enum FollowerType {
-        FEEDFORWARD_ONLY,
         PID,
         PURE_PURSUIT,
     }
 
-    FollowerType mFollowerType = FollowerType.PID;
+    FollowerType mFollowerType = FollowerType.PURE_PURSUIT;
 
     public void setFollowerType(FollowerType type) {
         mFollowerType = type;
     }
-
-    final SwerveDriveKinematics swerve_kinematics_;
-    final SwerveKinematicLimits swerve_kinematic_limits_;
-
-    private boolean useDefaultCook = true;
-
     TrajectoryIterator<TimedState<Pose2dWithMotion>> mCurrentTrajectory;
+    public Trajectory<TimedState<Pose2dWithMotion>> getTrajectory() {
+        return mCurrentTrajectory.trajectory();
+    }
+    public TrajectoryIterator<TimedState<Pose2dWithMotion>> getIterator() {
+        return mCurrentTrajectory;
+    }
+    public double getRemainingProgress() {
+        if (mCurrentTrajectory != null) {
+            return mCurrentTrajectory.getRemainingProgress();
+        }
+        return 0.0;
+    }
     boolean mIsReversed = false;
     double mLastTime = Double.POSITIVE_INFINITY;
     public TimedState<Pose2dWithMotion> mLastSetpoint = null;
     public TimedState<Pose2dWithMotion> mSetpoint = new TimedState<>(Pose2dWithMotion.identity());
     Pose2d mError = Pose2d.identity();
-
     ErrorTracker mErrorTracker = new ErrorTracker(15 * 100);
     Translation2d mTranslationalError = Translation2d.identity();
     Rotation2d mPrevHeadingError = Rotation2d.identity();
     Pose2d mCurrentState = Pose2d.identity();
-
     double mCurrentTrajectoryLength = 0.0;
     double mTotalTime = Double.POSITIVE_INFINITY;
     double mStartTime = Double.POSITIVE_INFINITY;
     ChassisSpeeds mOutput = new ChassisSpeeds();
-
     Lookahead mSpeedLookahead = null;
 
     // PID controllers for path following
@@ -79,9 +82,24 @@ public class DriveMotionPlanner implements CSVWritable {
 
     double mDt = 0.0;
 
-    public DriveMotionPlanner(SwerveDriveKinematics kinematics, SwerveKinematicLimits kinematic_limits) {
-        swerve_kinematics_ = kinematics;
-        swerve_kinematic_limits_ = kinematic_limits;
+    public double getMaxRotationSpeed() {
+        final double kStartPoint = 0.1;
+        final double kPivotPoint = 0.5;
+        final double kEndPoint = 1.0; // 0.8
+        final double kMaxSpeed = 1.0;
+        double normalizedProgress = mCurrentTrajectory.getProgress() / mCurrentTrajectoryLength;
+        double scalar = 0.0;
+        if (kStartPoint <= normalizedProgress && normalizedProgress <= kEndPoint) {
+            if (normalizedProgress <= kPivotPoint) {
+                scalar = (normalizedProgress - kStartPoint) / (kPivotPoint - kStartPoint);
+            } else {
+                scalar = 1.0 - ((normalizedProgress - kPivotPoint) / (kPivotPoint - kStartPoint));
+            }
+        }
+        return  kMaxSpeed * scalar;
+    }
+
+    public DriveMotionPlanner() {
     }
 
     public void setTrajectory(final TrajectoryIterator<TimedState<Pose2dWithMotion>> trajectory) {
@@ -116,10 +134,13 @@ public class DriveMotionPlanner implements CSVWritable {
             final List<Pose2d> waypoints,
             final List<Rotation2d> headings,
             final List<TimingConstraint<Pose2dWithMotion>> constraints,
-            double max_vel,  // m/s
-            double max_accel,  // m/s^2
-            double max_voltage) {
-        return generateTrajectory(reversed, waypoints, headings, constraints, 0.0, 0.0, max_vel, max_accel, max_voltage);
+            double max_vel, // m/s
+            double max_accel, // m/s^2
+            double max_decel, // m/s^2
+            double max_voltage,
+            double default_vel,
+            int slowdown_chunks) {
+        return generateTrajectory(reversed, waypoints, headings, constraints, 0.0, 0.0, max_vel, max_accel, max_decel, max_voltage, default_vel, slowdown_chunks);
     }
 
     public Trajectory<TimedState<Pose2dWithMotion>> generateTrajectory(
@@ -131,7 +152,10 @@ public class DriveMotionPlanner implements CSVWritable {
             double end_vel,
             double max_vel,  // m/s
             double max_accel,  // m/s^2
-            double max_voltage) {
+            double max_decel,
+            double max_voltage,
+            double default_vel,
+            int slowdown_chunks) {
         List<Pose2d> waypoints_maybe_flipped = waypoints;
         List<Rotation2d> headings_maybe_flipped = headings;
         final Pose2d flip = Pose2d.fromRotation(new Rotation2d(-1, 0, false));
@@ -159,15 +183,13 @@ public class DriveMotionPlanner implements CSVWritable {
 
         // Create the constraint that the robot must be able to traverse the trajectory without ever applying more
         // than the specified voltage.
-        final SwerveDriveDynamicsConstraint<Pose2dWithMotion> drive_constraints = new
-                SwerveDriveDynamicsConstraint<>(swerve_kinematics_, swerve_kinematic_limits_);
+
         final double kMaxYawRateRadS = 3.0;
         final YawRateConstraint yaw_constraint = new YawRateConstraint(kMaxYawRateRadS);
         final double kMaxCentripetalAccel = 10.0;//1.524;  // m/s^2
         final CentripetalAccelerationConstraint centripetal_accel_constraint = new CentripetalAccelerationConstraint(kMaxCentripetalAccel);
 
         List<TimingConstraint<Pose2dWithMotion>> all_constraints = new ArrayList<>();
-        all_constraints.add(drive_constraints);
         all_constraints.add(yaw_constraint);
         all_constraints.add(centripetal_accel_constraint);
         if (constraints != null) {
@@ -175,9 +197,11 @@ public class DriveMotionPlanner implements CSVWritable {
         }
 
         // Generate the timed trajectory.
-        return TimingUtil.timeParameterizeTrajectory
+        Trajectory<TimedState<Pose2dWithMotion>> timed_trajectory = TimingUtil.timeParameterizeTrajectory
                 (reversed, new
-                        DistanceView<>(trajectory), kMaxDx, all_constraints, start_vel, end_vel, max_vel, max_accel);
+                        DistanceView<>(trajectory), kMaxDx, all_constraints, start_vel, end_vel, max_vel, max_accel, max_decel, slowdown_chunks);
+        timed_trajectory.setDefaultVelocity(default_vel / Constants.SwerveConfig.kMaxLinearVelocity);
+        return timed_trajectory;
     }
 
     @Override
@@ -269,8 +293,8 @@ public class DriveMotionPlanner implements CSVWritable {
         return chassisSpeeds;
     }
 
-    public ChassisSpeeds update(double timestamp, Pose2d current_state, Twist2d current_velocity) {
-        if (mCurrentTrajectory == null) return null;
+    public ChassisSpeeds update(double timestamp, Pose2d current_state) {
+        if (mCurrentTrajectory == null) return new ChassisSpeeds();
 
         if (!Double.isFinite(mLastTime)) mLastTime = timestamp;
         mDt = timestamp - mLastTime;
@@ -284,24 +308,7 @@ public class DriveMotionPlanner implements CSVWritable {
             mError = current_state.inverse().transformBy(mSetpoint.state().getPose());
             mErrorTracker.addObservation(mError);
 
-            if (mFollowerType == FollowerType.FEEDFORWARD_ONLY) {
-                sample_point = mCurrentTrajectory.advance(mDt);
-                RobotState.getInstance().setDisplaySetpointPose(Pose2d.fromTranslation(RobotState.getInstance().getFieldToOdom(timestamp)).transformBy(sample_point.state().state().getPose()));
-                mSetpoint = sample_point.state();
-
-                final double velocity_m = mSetpoint.velocity();
-                // Field relative
-                var course = mSetpoint.state().getCourse();
-                Rotation2d motion_direction = course.orElseGet(Rotation2d::identity);
-                // Adjust course by ACTUAL heading rather than planned to decouple heading and translation errors.
-                motion_direction = current_state.getRotation().inverse().rotateBy(motion_direction);
-
-                mOutput = new ChassisSpeeds(
-                        motion_direction.cos() * velocity_m,
-                        motion_direction.sin() * velocity_m,
-                        // Need unit conversion because Pose2dWithMotion heading rate is per unit distance.
-                        velocity_m * mSetpoint.state().getHeadingRate());
-            } else if (mFollowerType == FollowerType.PID) {
+            if (mFollowerType == FollowerType.PID) {
                 sample_point = mCurrentTrajectory.advance(mDt);
                 RobotState.getInstance().setDisplaySetpointPose(Pose2d.fromTranslation(RobotState.getInstance().getFieldToOdom(timestamp)).transformBy(sample_point.state().state().getPose()));
                 mSetpoint = sample_point.state();
@@ -328,7 +335,7 @@ public class DriveMotionPlanner implements CSVWritable {
                 double reverseDistance = distance(current_state, previewQuantity - searchStepSize);
                 searchDirection = Math.signum(reverseDistance - forwardDistance);
                 while(searchStepSize > 0.001){
-                    if(Util.epsilonEquals(distance(current_state, previewQuantity), 0.0, 0.01)) break;
+                    if(Util.epsilonEquals(distance(current_state, previewQuantity), 0.0, 0.001)) break;
                     while(/* next point is closer than current point */ distance(current_state, previewQuantity + searchStepSize*searchDirection) <
                             distance(current_state, previewQuantity)) {
                         /* move to next point */
@@ -343,9 +350,9 @@ public class DriveMotionPlanner implements CSVWritable {
                 mOutput = updatePurePursuit(current_state);
             }
         } else {
+            System.out.println("Motion Planner Done: Returning zero chassis speeds");
             mOutput = new ChassisSpeeds();
         }
-
         return mOutput;
     }
 
