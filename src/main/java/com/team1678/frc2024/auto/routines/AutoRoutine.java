@@ -1,11 +1,8 @@
 package com.team1678.frc2024.auto.routines;
 
-import com.choreo.lib.*;
-import com.team1678.frc2024.requests.LambdaRequest;
-import com.team1678.frc2024.requests.Request;
+import com.team1678.frc2024.subsystems.requests.LambdaRequest;
+import com.team1678.frc2024.subsystems.requests.Request;
 import com.team1678.lib.util.Stopwatch;
-
-import java.util.ArrayList;
 
 public abstract class AutoRoutine implements IAutoRoutine {
     protected final Stopwatch runtimeStopwatch = new Stopwatch();

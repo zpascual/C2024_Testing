@@ -1,4 +1,4 @@
-package com.team1678.lib.mechanisms.swerve;
+package com.team1678.lib.swerve;
 
 import java.util.ArrayList;
 import java.util.List;

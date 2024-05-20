@@ -1,4 +1,4 @@
-package com.team1678.lib.mechanisms.swerve;
+package com.team1678.lib.swerve;
 
 public class SwerveSetpoint {
     public ChassisSpeeds mChassisSpeeds;

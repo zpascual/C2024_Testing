@@ -1,28 +1,21 @@
 package com.team1678.frc2024.planners;
 
 import java.text.DecimalFormat;
-import java.util.ArrayList;
-import java.util.List;
 
 import com.team1678.frc2024.Constants;
 import com.team1678.frc2024.RobotState;
 import com.team1678.lib.control.ErrorTracker;
 import com.team1678.lib.control.Lookahead;
-import com.team1678.lib.mechanisms.swerve.ChassisSpeeds;
+import com.team1678.lib.swerve.ChassisSpeeds;
 import com.team254.lib.geometry.Pose2d;
 import com.team254.lib.geometry.Pose2dWithMotion;
 import com.team254.lib.geometry.Rotation2d;
 import com.team254.lib.geometry.Translation2d;
 import com.team254.lib.geometry.Twist2d;
-import com.team254.lib.trajectory.DistanceView;
 import com.team254.lib.trajectory.Trajectory;
 import com.team254.lib.trajectory.TrajectoryIterator;
 import com.team254.lib.trajectory.TrajectorySamplePoint;
-import com.team254.lib.trajectory.timing.CentripetalAccelerationConstraint;
 import com.team254.lib.trajectory.timing.TimedState;
-import com.team254.lib.trajectory.timing.TimingConstraint;
-import com.team254.lib.trajectory.timing.TimingUtil;
-import com.team254.lib.trajectory.timing.YawRateConstraint;
 import com.team254.lib.util.CSVWritable;
 import com.team254.lib.util.SynchronousPIDF;
 import com.team254.lib.util.Util;

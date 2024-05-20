@@ -40,4 +40,9 @@ public class Ports {
     public static final DIODevice SERIALIZER_BEAM_BREAK = new DIODevice(0);
     public static final DIODevice FEEDER_BEAM_BREAK = new DIODevice(1);
     public static final DIODevice AMP_BEAM_BREAK = new DIODevice(2);
+
+    // Groupings
+    public static final CANDevice[] kModuleEncoders = new CANDevice[] {
+      FRONT_RIGHT_CANCODER, FRONT_LEFT_CANCODER, REAR_LEFT_CANCODER, REAR_RIGHT_CANCODER
+    };
 }

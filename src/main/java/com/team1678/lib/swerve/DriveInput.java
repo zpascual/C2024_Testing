@@ -1,4 +1,4 @@
-package com.team1678.lib.mechanisms.swerve;
+package com.team1678.lib.swerve;
 
 import com.team254.lib.util.LatchedBoolean;
 import com.team254.lib.util.TimeDelayedBoolean;

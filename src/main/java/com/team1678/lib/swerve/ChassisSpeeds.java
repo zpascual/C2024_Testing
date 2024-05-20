@@ -3,7 +3,7 @@
 // the WPILib BSD license file in the root directory of this project.
 
 
-package com.team1678.lib.mechanisms.swerve;
+package com.team1678.lib.swerve;
 
 import com.team254.lib.geometry.Rotation2d;
 import com.team254.lib.geometry.Twist2d;

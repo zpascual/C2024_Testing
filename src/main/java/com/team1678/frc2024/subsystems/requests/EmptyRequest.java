@@ -1,4 +1,4 @@
-package com.team1678.frc2024.requests;
+package com.team1678.frc2024.subsystems.requests;
 
 public class EmptyRequest extends Request{
 	
@@ -7,7 +7,12 @@ public class EmptyRequest extends Request{
 		// empty, as the name suggests
 	}
 
-    @Override
+	@Override
+	public boolean isFinished() {
+		return true;
+	}
+
+	@Override
 	public String toString() {
 		return "EmptyRequest()";
 	}

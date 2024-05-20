@@ -1,9 +1,9 @@
 package com.team254.lib.trajectory.timing;
 
-import com.team1678.lib.mechanisms.swerve.ChassisSpeeds;
-import com.team1678.lib.mechanisms.swerve.SwerveDriveKinematics;
-import com.team1678.lib.mechanisms.swerve.SwerveKinematicLimits;
-import com.team1678.lib.mechanisms.swerve.SwerveSetpointGenerator;
+import com.team1678.lib.swerve.ChassisSpeeds;
+import com.team1678.lib.swerve.SwerveDriveKinematics;
+import com.team1678.lib.swerve.SwerveKinematicLimits;
+import com.team1678.lib.swerve.SwerveSetpointGenerator;
 import com.team254.lib.geometry.ICourse2d;
 import com.team254.lib.geometry.ICurvature;
 import com.team254.lib.geometry.IPose2d;

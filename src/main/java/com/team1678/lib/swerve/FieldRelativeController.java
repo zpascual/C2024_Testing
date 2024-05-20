@@ -1,4 +1,4 @@
-package com.team1678.lib.mechanisms.swerve;
+package com.team1678.lib.swerve;
 
 import com.team1678.frc2024.Constants;
 import com.team1678.frc2024.RobotState;
@@ -11,7 +11,7 @@ public class FieldRelativeController implements IDriveController {
     public SwerveHeadingController mSwerveHeadingController = SwerveHeadingController.getInstance();
     public RadiusController mRadiusController = RadiusController.getInstance();
 
-    private RobotState mRobotState = RobotState.getInstance();
+    private final RobotState mRobotState = RobotState.getInstance();
 
     public static FieldRelativeController getInstance() {
         if (mInstance == null) {
@@ -32,7 +32,7 @@ public class FieldRelativeController implements IDriveController {
             return ChassisSpeeds.fromFieldRelativeSpeeds(
                     driveInput.getThrottle() * Constants.SwerveConfig.kMaxLinearVelocity * Constants.kTranslationScaler,
                     driveInput.getStrafe() * Constants.SwerveConfig.kMaxLinearVelocity * Constants.kTranslationScaler,
-                    mSwerveHeadingController.update(robotPose.getRotation().getDegrees()) * Constants.SwerveConfig.kMaxAngularAccel,
+                    mSwerveHeadingController.update(robotPose.getRotation().getDegrees()) * Constants.SwerveConfig.kMaxAngularVelocity,
                     robotPose.getRotation());
         }
         return ChassisSpeeds.fromFieldRelativeSpeeds(

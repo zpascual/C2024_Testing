@@ -1,10 +1,10 @@
 package com.team1678.frc2024.planners;
 
 import com.team1678.frc2024.Constants;
-import com.team1678.lib.mechanisms.swerve.ChassisSpeeds;
 import com.team1678.lib.motion.MotionProfileGoal;
 import com.team1678.lib.motion.MotionState;
 import com.team1678.lib.motion.ProfileFollower;
+import com.team1678.lib.swerve.ChassisSpeeds;
 import com.team254.lib.geometry.Rotation2d;
 import com.team254.lib.geometry.Twist2d;
 import com.team254.lib.util.TimeDelayedBoolean;

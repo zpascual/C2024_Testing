@@ -1,4 +1,4 @@
-package com.team1678.frc2024.requests;
+package com.team1678.frc2024.subsystems.requests;
 
 public class LambdaRequest extends Request{
 
@@ -15,6 +15,11 @@ public class LambdaRequest extends Request{
     @Override
     public void act() {
         mF.f();
+    }
+
+    @Override
+    public boolean isFinished() {
+        return true;
     }
 
     @Override

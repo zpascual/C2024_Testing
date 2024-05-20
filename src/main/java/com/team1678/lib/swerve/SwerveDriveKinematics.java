@@ -2,7 +2,7 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-package com.team1678.lib.mechanisms.swerve;
+package com.team1678.lib.swerve;
 
 import com.team254.lib.geometry.Rotation2d;
 import com.team254.lib.geometry.Translation2d;
@@ -60,7 +60,7 @@ public class SwerveDriveKinematics {
         m_rotations = new Rotation2d[m_numModules];
 
         for (int i = 0; i < m_numModules; i++) {
-            m_inverseKinematics.setRow(i * 2 + 0, 0, /* Start Data */ 1, 0, -m_modules[i].y());
+            m_inverseKinematics.setRow(i * 2, 0, /* Start Data */ 1, 0, -m_modules[i].y());
             m_inverseKinematics.setRow(i * 2 + 1, 0, /* Start Data */ 0, 1, +m_modules[i].x());
             m_rotations[i] = new Rotation2d(m_modules[i].x(), m_modules[i].y(), true);
         }
@@ -91,7 +91,7 @@ public class SwerveDriveKinematics {
         if (!centerOfRotationMeters.equals(m_prevCoR)) {
             for (int i = 0; i < m_numModules; i++) {
                 m_inverseKinematics.setRow(
-                        i * 2 + 0,
+                        i * 2,
                         0, /* Start Data */
                         1,
                         0,
@@ -258,10 +258,9 @@ public class SwerveDriveKinematics {
         // t is now right direction, set right magnitude.
         t.scale(magnitude / t.norm());
 
-        ChassisSpeeds r = new ChassisSpeeds(speeds.vxMetersPerSecond + t.x(),
+        return new ChassisSpeeds(speeds.vxMetersPerSecond + t.x(),
                 speeds.vyMetersPerSecond + t.y(),
                 speeds.omegaRadiansPerSecond);
-        return r;
     }
 }
 

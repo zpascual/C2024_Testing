@@ -1,16 +1,16 @@
-package com.team1678.frc2024.requests;
+package com.team1678.frc2024.subsystems.requests;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import com.team1678.frc2024.requests.LambdaRequest.VoidInterface;
+import com.team1678.frc2024.subsystems.requests.LambdaRequest.VoidInterface;
 
 public abstract class Request {
 
 	public abstract void act();
 	
-	public boolean isFinished() {return true;}
+	public abstract boolean isFinished();
 
 	private final List<Prerequisite> prerequisites = new ArrayList<>();
 
