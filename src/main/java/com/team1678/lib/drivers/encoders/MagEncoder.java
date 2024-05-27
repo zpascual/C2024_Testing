@@ -1,6 +1,5 @@
-package com.team1678.lib.sensors.encoders;
+package com.team1678.lib.drivers.encoders;
 
-import com.team1678.frc2024.Robot;
 import com.team1678.frc2024.Settings;
 import edu.wpi.first.wpilibj.DigitalInput;
 import edu.wpi.first.wpilibj.DutyCycle;

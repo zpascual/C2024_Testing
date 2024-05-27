@@ -1,6 +1,8 @@
 package com.team1678.frc2024;
 
 import com.team1678.lib.motion.MotionProfileConstraints;
+import com.team1678.lib.util.Util;
+import org.opencv.core.Mat;
 
 public class Constants {
     public static final double kLooperDt =  0.01;
@@ -30,6 +32,11 @@ public class Constants {
         public static final double kMaxAngularVelocity = kMaxLinearVelocity / Math.hypot(kTrackWidth / 2.0, kWheelBase / 2.0);
         public static final double kMaxAngularAccel = kMaxLinearAccel / Math.hypot(kTrackWidth / 2.0, kWheelBase / 2.0);
         public static final boolean kUseVelocityDrive = true;
+        public static final double kAzmithRatio = 15.0;
+        public static final double kDriveRatio = 5.8;
+        public static final double kAzmithTolerance = 10.0;
+        public static final double kMotionMagicDriveToleranceInches = 2.0;
+        public static final double kDriveRotorRevPerMeter = kDriveRatio / (Math.PI * Util.convertInchesToMeters(kWheelDiameter));
     }
 
     public static class SwerveHeadingController {
@@ -79,10 +86,22 @@ public class Constants {
 
     public static class PurePursuit {
         public static final double kPathLookaheadTime = 0.25; //seconds
-        public static final double kPathMinLookaheadDistance = 12.0; //From 1323 (2019)
+        public static final double kPathMinLookaheadDistance = 12.0; // From 1323 (2019)
         public static final double kAdaptivePathMinLookaheadDistance = 6.0;
         public static final double kAdaptivePathMaxLookaheadDistance = 24.0;
         public static final double kAdaptiveErrorLookaheadCoefficient = 4.0;
+    }
+
+    public static class MotorData {
+        public static final double kMaxFalconRotationsPerSecond = 6380.0 / 60.0;
+        public static final double kMaxFalconEncoderSpeed = 6380.0 * 2048.0 / 600.0;
+        public static final double kFalconMotionMagicFeedForward = 1023.0 / kMaxFalconEncoderSpeed;
+
+        public static final double kMaxKrakenRotationsPerSecond = 6000.0 / 60.0;
+        public static final double kMaxKrakenEncoderSpeed = 6000.0 * 2048.0 / 600.0;
+        public static final double kKrakenMotionMagicFeedForward = 12.0 / kMaxKrakenRotationsPerSecond;
+
+        public static final double kTalonFxEncoderResolution = 2048.0;
     }
 
 }

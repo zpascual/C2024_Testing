@@ -1,10 +1,9 @@
-package com.team1678.lib.sensors.encoders;
+package com.team1678.lib.drivers.encoders;
 
 import com.ctre.phoenix6.configs.CANcoderConfiguration;
 import com.ctre.phoenix6.hardware.CANcoder;
 import com.ctre.phoenix6.signals.AbsoluteSensorRangeValue;
 import com.ctre.phoenix6.signals.SensorDirectionValue;
-import com.team1678.frc2024.Robot;
 import com.team1678.frc2024.Settings;
 import com.team1678.lib.drivers.CANDevice;
 

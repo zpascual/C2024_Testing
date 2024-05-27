@@ -1,4 +1,4 @@
-package com.team1678.lib.sensors.encoders;
+package com.team1678.lib.drivers.encoders;
 
 public interface IEncoder {
     double getDegrees();
