@@ -38,6 +38,8 @@ public class CANDevice {
         return mSecondaryDeviceNumber;
     }
 
+    public CANBus getBus() {return mBusName;}
+
     public String getBusName() {return mBusName.name;}
 
     public enum CANBus {

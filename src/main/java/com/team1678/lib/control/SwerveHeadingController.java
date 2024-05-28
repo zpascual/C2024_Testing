@@ -2,9 +2,11 @@ package com.team1678.lib.control;
 
 import com.team1678.frc2024.Constants;
 import com.team1678.frc2024.RobotState;
-import com.team254.lib.geometry.Pose2d;
-import com.team254.lib.geometry.Translation2d;
+import com.team1678.lib.util.Stopwatch;
 import com.team254.lib.util.SynchronousPIDF;
+import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Translation2d;
+import edu.wpi.first.wpilibj.Timer;
 
 /**
  * Controls overall swerve heading of the robot through motion profile.
@@ -13,8 +15,6 @@ import com.team254.lib.util.SynchronousPIDF;
  */
 public class SwerveHeadingController {
     private static SwerveHeadingController mInstance;
-    private RobotState mRobotState = RobotState.getInstance();
-
     public static SwerveHeadingController getInstance() {
         if (mInstance == null) {
             mInstance = new SwerveHeadingController();
@@ -23,60 +23,81 @@ public class SwerveHeadingController {
         return mInstance;
     }
 
-    public Pose2d centerOfGoal;
-
     public enum HeadingControllerState {
-        OFF, SNAP, // for snapping to specific headings
+        OFF, MOVE_SNAP, STATIONARY_SNAP,// for snapping to specific headings
         MAINTAIN, // maintaining current heading while driving
         POLAR_MAINTAIN, // for maintaining heading toward origin
         POLAR_SNAP, // for snapping heading toward origin
+        TEMPORARILY_DISABLE, // basic...
     }
 
     private final SynchronousPIDF mPIDFController;
     private double mSetpoint = 0.0;
+    private final Stopwatch disabledStopWatch;
+    private final double disableTimeLength = 0.2; //ms
 
     private HeadingControllerState mHeadingControllerState = HeadingControllerState.OFF;
 
     private SwerveHeadingController() {
         mPIDFController = new SynchronousPIDF();
+        disabledStopWatch = new Stopwatch();
     }
 
-    public HeadingControllerState getHeadingControllerState() {
+    public HeadingControllerState getState() {
         return mHeadingControllerState;
     }
 
-    public void setHeadingControllerState(HeadingControllerState state) {
+    public void setState(HeadingControllerState state) {
         mHeadingControllerState = state;
     }
 
     /**
-     * @param goal_pos pos in degrees
+     * @param targetAngle Target angle in degrees
      */
-    public void setGoal(double goal_pos) {
-        mSetpoint = goal_pos;
+    public void setTarget(double targetAngle) {
+        mSetpoint = targetAngle;
     }
 
-    public double getGoal() {
+    public double getTargetSetpoint() {
         return mSetpoint;
     }
 
-    public boolean isAtGoal() {
-        return mPIDFController.onTarget(Constants.SwerveHeadingController.kSwerveHeadingControllerErrorTolerance);
+    public boolean isAtTarget() {
+        return mPIDFController.onTarget(Constants.SwerveHeadingController.kErrorTolerance);
     }
 
-    public double calculateAngleToOrigin(Pose2d current_pose) {
-        centerOfGoal = mRobotState.getFieldToGoal();
-        double r = current_pose.getTranslation().distance(Translation2d.identity());
-        double theta = Math.atan2(current_pose.getTranslation().y(), current_pose.getTranslation().x());
-        double r_central = centerOfGoal.getTranslation().distance(Translation2d.identity());
-        double theta_central = Math.atan2(centerOfGoal.getTranslation().y(), centerOfGoal.getTranslation().x());
+    public void disable() {
+        setState(HeadingControllerState.OFF);
+    }
 
-        double angle = Math.toDegrees(Math.PI + Math.atan2(r * Math.sin(theta) - r_central * Math.sin(theta_central),
-                r * Math.cos(theta) - r_central * Math.cos(theta_central)));
-        if(angle < 0) {
-            return -angle;
-        }
-        return angle;
+    public void temporarilyDisable() {
+        disable();
+        disabledStopWatch.start();
+    }
+
+    public void setMoveSnapTarget(double angle) {
+        setTarget(angle);
+        setState(HeadingControllerState.MOVE_SNAP);
+    }
+
+    public void setPolarSnapTarget(double angle) {
+        setTarget(angle);
+        setState(HeadingControllerState.POLAR_SNAP);
+    }
+
+    public void setMaintainTarget(double angle) {
+        setTarget(angle);
+        setState(HeadingControllerState.MAINTAIN);
+    }
+
+    public void setPolarMaintainTarget(double angle) {
+        setTarget(angle);
+        setState(HeadingControllerState.POLAR_MAINTAIN);
+    }
+
+    public void setStationarySnapTarget(double angle) {
+        setTarget(angle);
+        setState(HeadingControllerState.STATIONARY_SNAP);
     }
 
     /**
@@ -92,33 +113,29 @@ public class SwerveHeadingController {
             current_angle -= 360;
         }
 
-        var current_translational_velocity = RobotState.getInstance().getMeasuredVelocity().norm();
-        final double kMinTranslationalVelocity = 0.2;
-        if (current_translational_velocity < kMinTranslationalVelocity) {
-            current_translational_velocity = kMinTranslationalVelocity;
-        }
-        final double kMaxTranlationalVelocity = 2.5;
-        if (current_translational_velocity > kMaxTranlationalVelocity) {
-            current_translational_velocity = kMaxTranlationalVelocity;
-        }
-        double interp = (current_translational_velocity - kMinTranslationalVelocity) / kMaxTranlationalVelocity;
-
         switch (mHeadingControllerState) {
             case OFF:
                 return 0.0;
-            case SNAP, POLAR_SNAP:
-                mPIDFController.setPID(Constants.SwerveHeadingController.kSnapSwerveHeadingKp, Constants.SwerveHeadingController.kSnapSwerveHeadingKi, Constants.SwerveHeadingController.kSnapSwerveHeadingKd);
+            case MOVE_SNAP, POLAR_SNAP:
+                mPIDFController.setPID(Constants.SwerveHeadingController.kSnapKp, Constants.SwerveHeadingController.kSnapKi, Constants.SwerveHeadingController.kSnapKd);
                 break;
             case MAINTAIN:
-//                var kp = interp * (Constants.kMaintainSwerveHeadingKpHighVelocity - Constants.kMaintainSwerveHeadingKpLowVelocity) + Constants.kMaintainSwerveHeadingKpLowVelocity;
-//                var ki = interp * (Constants.kMaintainSwerveHeadingKiHighVelocity - Constants.kMaintainSwerveHeadingKiLowVelocity) + Constants.kMaintainSwerveHeadingKiLowVelocity;
-//                var kd = interp * (Constants.kMaintainSwerveHeadingKdHighVelocity - Constants.kMaintainSwerveHeadingKdLowVelocity) + Constants.kMaintainSwerveHeadingKdLowVelocity;
-                mPIDFController.setPID(Constants.SwerveHeadingController.kMaintainSwerveHeadingKpHighVelocity, 0, 0);
+                mPIDFController.setPID(Constants.SwerveHeadingController.kMaintainKpHighVelocity, Constants.SwerveHeadingController.kMaintainKiHighVelocity, Constants.SwerveHeadingController.kMaintainKdHighVelocity);
                 mPIDFController.setOutputRange(-1.0, 1.0);
                 break;
             case POLAR_MAINTAIN:
-                //mPIDFController.setPID(Constants.kMaintainSwerveHeadingKp, Constants.kMaintainSwerveHeadingKi, Constants.kMaintainSwerveHeadingKd);
+                mPIDFController.setPID(Constants.SwerveHeadingController.kPolarMaintainKp, Constants.SwerveHeadingController.kPolarMaintainKi, Constants.SwerveHeadingController.kPolarMaintainKd);
                 break;
+            case TEMPORARILY_DISABLE:
+                setTarget(current_angle);
+                if (disabledStopWatch.getTime() >= disableTimeLength) {
+                    setState(HeadingControllerState.MAINTAIN);
+                    disabledStopWatch.reset();
+                }
+                break;
+            case STATIONARY_SNAP:
+                mPIDFController.setPID(Constants.SwerveHeadingController.kSnapStationaryKp, Constants.SwerveHeadingController.kSnapStationaryKi, Constants.SwerveHeadingController.kSnapStationaryKd);
+
         }
 
         return mPIDFController.calculate(current_angle);

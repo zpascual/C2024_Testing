@@ -116,10 +116,10 @@ public abstract class SwerveModule implements ISubsystem {
         public final InvertedValue invertType;
         public final CANDevice.CANBus bus;
 
-        public SwerveMotorInfo(int deviceId, InvertedValue invertType, CANDevice.CANBus bus) {
-            this.deviceId = deviceId;
+        public SwerveMotorInfo(CANDevice device, InvertedValue invertType) {
+            this.deviceId = device.getDeviceNumber();
             this.invertType = invertType;
-            this.bus = bus;
+            this.bus = device.getBus();
         }
     }
 

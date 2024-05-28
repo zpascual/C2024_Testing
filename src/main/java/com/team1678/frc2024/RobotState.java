@@ -176,65 +176,6 @@ public class RobotState {
         return vehicle_velocity_measured_filtered_.getAverage();
     }
 
-    /**
-     * Adds a Vision Update
-     * @param visionUpdate
-     */
-     /*
-    public synchronized void addVisionUpdate(VisionUpdate visionUpdate) {
-        mLatestVisionUpdate = Optional.ofNullable(visionUpdate);
-        if (!mLatestVisionUpdate.isEmpty()) {
-            //Get the Timestamp of the Vision Reading
-            double visionTimestamp = mLatestVisionUpdate.get().getTimestamp();
-            
-            Pose2d odomToVehicle = getOdomToVehicle(visionTimestamp);
-
-            //Rotating Camera by Yaw Offset
-            Pose2d cameraToTag = Pose2d.fromTranslation(mLatestVisionUpdate.get().getCameraToTag().rotateBy(Constants.kLimelightConstants.getYawOffset()));
-
-            //Getting Vehicle to Tag in Field Frame
-            Pose2d vehicleToTag = Pose2d.fromTranslation(Constants.kRobotToCamera.transformBy(cameraToTag).getTranslation().rotateBy(odomToVehicle.getRotation()));
-
-            //Getting Field to Vehicle via Vehicle to Tag
-            Pose2d visionFieldToVehicle = mLatestVisionUpdate.get().getFieldToTag().transformBy(vehicleToTag.inverse());
-
-            if (!mPoseAcceptor.shouldAcceptVision(mLatestVisionUpdate.get().getTimestamp(), visionFieldToVehicle, vehicleToTag, vehicle_velocity_measured_)) {
-                return;
-            }
-
-            boolean disabledAndNeverEnabled = DriverStation.isDisabled() && !mHasBeenEnabled;
-            if (initial_field_to_odom_.isEmpty() || disabledAndNeverEnabled) {
-                var odom_to_vehicle_translation = disabledAndNeverEnabled ? Translation2d.identity() : getOdomToVehicle(visionTimestamp).getTranslation();
-                field_to_odom_.put(new InterpolatingDouble(visionTimestamp), visionFieldToVehicle.getTranslation().translateBy(odom_to_vehicle_translation.inverse()));
-                initial_field_to_odom_ = Optional.of(field_to_odom_.lastEntry().getValue());
-                mKalmanFilter.setXhat(0, field_to_odom_.lastEntry().getValue().x());
-                mKalmanFilter.setXhat(1, field_to_odom_.lastEntry().getValue().y());
-                mDisplayVisionPose = visionFieldToVehicle;
-
-            } else if (DriverStation.isEnabled()) { 
-                var field_to_odom = visionFieldToVehicle.getTranslation().translateBy(odomToVehicle.getTranslation().inverse());
-                if(DriverStation.isAutonomous()) {
-                    final double kMaxDistanceToAccept = 2.0;
-                    if (field_to_odom.inverse().translateBy(field_to_odom_.lastEntry().getValue()).norm() > kMaxDistanceToAccept) {
-                        System.out.println("Invalid vision update!");
-                        return;
-                    }
-                }
-
-                mDisplayVisionPose = visionFieldToVehicle;
-                try {
-                    mKalmanFilter.correct(VecBuilder.fill(0.0, 0.0), VecBuilder.fill(field_to_odom.getTranslation().x(), field_to_odom.getTranslation().y()));
-                    field_to_odom_.put(new InterpolatingDouble(visionTimestamp), Pose2d.fromTranslation(new Translation2d(mKalmanFilter.getXhat(0), mKalmanFilter.getXhat(1))).getTranslation());
-                } catch (Exception e) {
-                    DriverStation.reportError("QR Decomposition failed: ", e.getStackTrace());
-                }
-            } else {
-                mDisplayVisionPose = null;
-            }
-        }
-    }
-    */
-
     public synchronized Pose2d getDisplayVisionPose() {
         if (mDisplayVisionPose == null) {
             //return Pose2d.fromTranslation(new Translation2d(Constants.kOutofFrameValue, Constants.kOutofFrameValue)); //Out of frame

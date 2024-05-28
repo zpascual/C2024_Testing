@@ -6,7 +6,6 @@ import com.team1678.frc2024.Constants;
 import com.team1678.frc2024.RobotState;
 import com.team1678.lib.control.ErrorTracker;
 import com.team1678.lib.control.Lookahead;
-import com.team1678.lib.swerve.ChassisSpeeds;
 import com.team254.lib.geometry.Pose2d;
 import com.team254.lib.geometry.Pose2dWithMotion;
 import com.team254.lib.geometry.Rotation2d;
@@ -19,6 +18,7 @@ import com.team254.lib.trajectory.timing.TimedState;
 import com.team254.lib.util.CSVWritable;
 import com.team254.lib.util.SynchronousPIDF;
 import com.team254.lib.util.Util;
+import edu.wpi.first.math.kinematics.ChassisSpeeds;
 
 public class DriveMotionPlanner implements CSVWritable {
     private static final double kMaxDx = 0.0127; // m
