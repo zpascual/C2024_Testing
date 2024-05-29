@@ -37,8 +37,12 @@ public class Util {
     }
 
     public static double normalize(double current, double test){
-        if(current > test) return current;
-        return test;
+        return Math.max(current, test);
+    }
+
+    public static double interpolate(double a, double b, double x) {
+        x = limit(x, 0.0, 1.0);
+        return a + (b - a) * x;
     }
 
     /**

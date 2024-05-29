@@ -3,6 +3,7 @@ package com.team1678.frc2024.subsystems;
 import com.ctre.phoenix6.signals.NeutralModeValue;
 import com.team1678.frc2024.Constants;
 import com.team1678.frc2024.Ports;
+import com.team1678.frc2024.Settings;
 import com.team1678.frc2024.loops.ILooper;
 import com.team1678.frc2024.loops.Loop;
 import com.team1678.frc2024.planners.DriveMotionPlanner;
@@ -11,13 +12,12 @@ import com.team1678.frc2024.subsystems.swerve.SwerveModule;
 import com.team1678.lib.control.SwerveHeadingController;
 import com.team1678.lib.drivers.gyros.Gyro;
 import com.team1678.lib.drivers.gyros.Pigeon2IMU;
-import com.team1678.lib.util.LogUtil;
+import com.team1678.lib.kinematics.SwerveInverseKinematics;
 import com.team1678.lib.util.Rotation2dHelper;
 import com.team1678.lib.util.Translation2dHelper;
 import com.team1678.lib.util.Util;
 import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator;
-import edu.wpi.first.math.filter.SlewRateLimiter;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
@@ -26,12 +26,9 @@ import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
-import edu.wpi.first.units.Unit;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Timer;
-import org.littletonrobotics.junction.LogTable;
 import org.littletonrobotics.junction.Logger;
-import org.littletonrobotics.junction.inputs.LoggableInputs;
 
 import java.util.Arrays;
 import java.util.List;
@@ -82,9 +79,9 @@ public class Drive implements ISubsystem {
         return false;
     }
 
-    Pose2d currentPose;
-    public Pose2d getCurrentPose(){
-        return currentPose;
+    Pose2d robotPose;
+    public Pose2d getRobotPose(){
+        return robotPose;
     }
     double distanceTraveled;
     double currentVelocity = 0.0;
@@ -109,6 +106,7 @@ public class Drive implements ISubsystem {
     }
 
     DriveMotionPlanner motionPlanner;
+
     public double getPlannerRemainingProgress() {
         if (motionPlanner != null && getState() == ControlState.TRAJECTORY) {
             return motionPlanner.getIterator().getRemainingProgress() / (motionPlanner.getIterator().getProgress() + motionPlanner.getIterator().getRemainingProgress());
@@ -158,7 +156,7 @@ public class Drive implements ISubsystem {
         );
 
         poseEstimator = new SwerveDrivePoseEstimator(kinematics, new Rotation2d(), getModulePositions(), new Pose2d(), VecBuilder.fill(0.1, 0.1, 0.1), VecBuilder.fill(0.1, 0.1, 0.1));
-        currentPose = poseEstimator.getEstimatedPosition();
+        robotPose = poseEstimator.getEstimatedPosition();
         distanceTraveled = 0.0;
     }
 
@@ -180,12 +178,13 @@ public class Drive implements ISubsystem {
     private Translation2d translationVector = new Translation2d();
     private double rotationalInput = 0.0;
     private Translation2d lastDriveVector = new Translation2d();
-    private final Translation2d rotationVector = new Translation2d();
+    private final Translation2d rotationalVector = new Translation2d();
     private double lowPowerScalar = 0.6; // percent (0-1)
     private double maxRotSpeedScalar = 0.8; // percent (0-1)
     private double maxSpeedScalar = 1.0; // percent (0-1)
     private void setMaxSpeedScalar(double scalar) {maxSpeedScalar = scalar;}
     private boolean isTranslationStickReset = false;
+    private SwerveInverseKinematics inverseKinematics = new SwerveInverseKinematics(Constants.SwerveModules.kModulePositions);
     private boolean isRobotCentric = false;
     public boolean getIsRobotCentric() {
         return isRobotCentric;
@@ -287,7 +286,95 @@ public class Drive implements ISubsystem {
         if (inputMagnitude > 0.1)
             lastDriveVector = new Translation2d(x, y);
         else if (translationVector.getX() == 0.0 && translationVector.getY() == 0.0 && rotate != 0.0)
-            lastDriveVector = rotationVector;
+            lastDriveVector = rotationalVector;
+
+    }
+
+    private void updateControlCycle(double timestamp) {
+        double rotationCorrection = headingController.update(robotPose.getRotation().getDegrees());
+
+        switch (getState()) {
+            case MANUAL:
+                if (translationVector.equals(new Translation2d()) && rotationalInput == 0.0) {
+                    if (lastDriveVector.equals(rotationalVector)) {
+                        stop();
+                    } else {
+                        setOpenLoopCoast(inverseKinematics.updateDriveVectors(lastDriveVector, rotationCorrection, robotPose, getIsRobotCentric()));
+                    }
+                } else {
+                    double scaledRotation = rotationCorrection * (1 - translationVector.getNorm() * 0.4) + rotationalInput;
+                    if (Settings.kIsUsingCompBot) {
+                        setClosedLoopVelocity(inverseKinematics.updateDriveVectors(translationVector, scaledRotation, robotPose, getIsRobotCentric()));
+                    } else {
+                        setOpenLoop(inverseKinematics.updateDriveVectors(translationVector, scaledRotation, robotPose, getIsRobotCentric()));
+                    }
+                }
+                break;
+            case POSITION:
+                // Currently not used
+                break;
+            case ROTATION:
+                setOpenLoop(inverseKinematics.updateDriveVectors(new Translation2d(), Util.deadBand(rotationCorrection, 0.1), robotPose, false));
+                break;
+            case TRAJECTORY:
+                handleTrajectoryUpdate(timestamp, robotPose, rotationCorrection);
+                break;
+            case VISION:
+                handleVisionUpdate(timestamp, robotPose, rotationCorrection);
+                break;
+            case NEUTRAL:
+                stop();
+                break;
+            default:
+                break;
+        }
+    }
+
+    public void handleTrajectoryUpdate(double timestamp, Pose2d robotPose, double rotationCorrection) {
+        if (motionPlanner.isDone()) {
+            Translation2d driveVector = motionPlanner.update(timestamp, );
+        }
+    }
+
+    private void zeroSensorsForAuto() {
+        if (!hasStartedTrjectory) {
+            if (moduleConfigRequested) {
+                zeroSensors();
+                System.out.println("Position reset for auto");
+            }
+            hasStartedTrjectory = true;
+        }
+    }
+
+    private double calculateTrajectoryRotationalInput(double rotationCorrection, double driveVecNorm) {
+        return Util.deadBand(Util.limit(rotationCorrection * rotationScalar * driveVecNorm, motionPlanner.getMaxRotationSpeed()), 0.01);
+    }
+
+    private Translation2d handleDriveVecNorm(Translation2d driveVec, double rotationalInput, Pose2d pose) {
+        if (Util.epsilonEquals(driveVec.getNorm(), 0.0)) {
+            driveVec = lastTrajectoryVector;
+            setClosedLoopVelocityStall(inverseKinematics.updateDriveVectors(driveVec, rotationalInput, pose, false));
+        } else {
+            setClosedLoopVelocity(inverseKinematics.updateDriveVectors(driveVec, rotationalInput, pose, false));
+        }
+        return driveVec;
+    }
+
+    private void updateModuleReadyStatus() {
+        if (areModuleAnglesOnTarget() && !modulesReady) {
+            modulesReady = true;
+            System.out.println("Modules Ready");
+        }
+    }
+
+    private void logPathCompletion(double timestamp) {
+        System.out.println("Path completed in: " + (timestamp - trajectoryStartTime));
+        hasFinishedTrajectory = true;
+        if (alwaysConfigModules) requireModuleConfig();
+    }
+
+    public void handleVisionUpdate(double timestamp, Pose2d robotPose, double rotationCorrection) {
+
     }
 
     private final Loop loop = new Loop() {
@@ -349,7 +436,7 @@ public class Drive implements ISubsystem {
     }
 
     public void updateOdometry(double timestamp) {
-        currentPose = poseEstimator.updateWithTime(timestamp, Rotation2d.fromDegrees(inputs.heading.getDegrees()), getModulePositions());
+        robotPose = poseEstimator.updateWithTime(timestamp, Rotation2d.fromDegrees(inputs.heading.getDegrees()), getModulePositions());
     }
 
     public void zeroModuleAngles() {
@@ -361,7 +448,7 @@ public class Drive implements ISubsystem {
     }
 
     public Rotation2d getHeading() {
-        return currentPose.getRotation();
+        return robotPose.getRotation();
     }
 
     @Override
@@ -383,7 +470,7 @@ public class Drive implements ISubsystem {
     @Override
     public void outputTelemetry() {
         modules.forEach(SwerveModule::outputTelemetry);
-        Logger.recordOutput("Swerve/Robot Pose", getCurrentPose());
+        Logger.recordOutput("Swerve/Robot Pose", getRobotPose());
         Logger.recordOutput("Swerve/Robot Heading", getHeading());
         Logger.recordOutput("Swerve/State", getState());
     }

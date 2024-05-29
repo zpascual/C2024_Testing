@@ -1,12 +1,8 @@
 package com.team1678.lib.control;
 
 import com.team1678.frc2024.Constants;
-import com.team1678.frc2024.RobotState;
 import com.team1678.lib.util.Stopwatch;
 import com.team254.lib.util.SynchronousPIDF;
-import edu.wpi.first.math.geometry.Pose2d;
-import edu.wpi.first.math.geometry.Translation2d;
-import edu.wpi.first.wpilibj.Timer;
 
 /**
  * Controls overall swerve heading of the robot through motion profile.

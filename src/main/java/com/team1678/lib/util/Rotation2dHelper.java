@@ -16,6 +16,7 @@ public class Rotation2dHelper {
     }
 
     public static Rotation2d inverse(Rotation2d rotation2d) {
-        return new Rotation2d(rotation2d.getCos(), -rotation2d.getSin());
+        if (!Double.isNaN(rotation2d.getSin()) && !Double.isNaN(rotation2d.getCos())) return new Rotation2d(rotation2d.getCos(), -rotation2d.getSin());
+        return Rotation2d.fromRadians(-rotation2d.getRadians());
     }
 }

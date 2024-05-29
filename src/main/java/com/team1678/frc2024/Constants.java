@@ -6,6 +6,9 @@ import com.team1678.lib.motion.MotionProfileConstraints;
 import com.team1678.lib.util.Util;
 import edu.wpi.first.math.geometry.Translation2d;
 
+import java.util.Arrays;
+import java.util.List;
+
 public class Constants {
     public static final double kLooperDt =  0.01;
 
@@ -66,6 +69,8 @@ public class Constants {
             public static final SwerveMotorInfo kAzmithMotorInfo = new SwerveMotorInfo(Ports.REAR_RIGHT_ROTATION, InvertedValue.Clockwise_Positive);
             public static final Translation2d kVehicleToModule = new Translation2d(Util.convertInchesToMeters(SwerveConfig.kTrackWidth/ 2.0), -Util.convertInchesToMeters(SwerveConfig.kWheelBase / 2.0));
         }
+
+        public static final List<Translation2d> kModulePositions = Arrays.asList(frontRight.kVehicleToModule, frontLeft.kVehicleToModule, rearLeft.kVehicleToModule, rearRight.kVehicleToModule);
     }
 
     public static class SwerveHeadingController {
