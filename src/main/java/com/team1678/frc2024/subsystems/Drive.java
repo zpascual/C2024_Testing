@@ -53,10 +53,6 @@ public class Drive implements ISubsystem {
         currentState = desiredState;
     }
 
-    public boolean isTracking() {
-        return getState() == ControlState.VISION;
-    }
-
     public SwerveModule frontRight, frontLeft, rearLeft, rearRight;
     private final List<SwerveModule> modules;
     private SwerveDriveKinematics kinematics;
@@ -268,7 +264,7 @@ public class Drive implements ISubsystem {
                 headingController.getState() == SwerveHeadingController.HeadingControllerState.POLAR_SNAP ||
                 headingController.getState() == SwerveHeadingController.HeadingControllerState.POLAR_MAINTAIN)
                 headingController.setMaintainTarget(headingController.getTargetSetpoint());
-            if (isTracking() || getState() == ControlState.POSITION) {
+            if (getState() == ControlState.POSITION) {
                 if (Math.hypot(x, y) >= 0.5 && isTranslationStickReset) {
                     isTranslationStickReset = false;
                     System.out.println("Vision Tracking Stopped Due To Translation Input");
@@ -319,11 +315,11 @@ public class Drive implements ISubsystem {
             case TRAJECTORY:
                 handleTrajectoryUpdate(timestamp, robotPose, rotationCorrection);
                 break;
-            case VISION:
-                handleVisionUpdate(timestamp, robotPose, rotationCorrection);
-                break;
             case NEUTRAL:
                 stop();
+                break;
+            case VISION:
+                handleTrajectoryUpdate(timestamp, robotPose, rotationCorrection);
                 break;
             default:
                 break;
@@ -332,7 +328,23 @@ public class Drive implements ISubsystem {
 
     public void handleTrajectoryUpdate(double timestamp, Pose2d robotPose, double rotationCorrection) {
         if (motionPlanner.isDone()) {
-            Translation2d driveVector = motionPlanner.update(timestamp, );
+            ChassisSpeeds speeds = motionPlanner.update(timestamp, robotPose);
+            double xVector = Math.signum(speeds.vxMetersPerSecond) * speeds.vxMetersPerSecond / Constants.SwerveConfig.kMaxLinearVelocity;
+            double yVector = Math.signum(speeds.vyMetersPerSecond) * speeds.vyMetersPerSecond / Constants.SwerveConfig.kMaxLinearVelocity;
+            Translation2d driveVector = new Translation2d(xVector, yVector);
+
+            if (modulesReady) {
+                zeroSensorsForAuto();
+                double rotationalInput = calculateTrajectoryRotationalInput(rotationCorrection, driveVector.getNorm());
+                driveVector = handleTrajectoryDriveVectorNorm(driveVector, rotationalInput, robotPose);
+            } else if (!moduleConfigRequested) {
+                setClosedLoopVelocityStall(inverseKinematics.updateDriveVectors(driveVector, 0.0, robotPose, false));
+                moduleConfigRequested = true;
+            }
+            updateModuleReadyStatus();
+            lastTrajectoryVector = driveVector;
+        } else if (!hasFinishedTrajectory) {
+            logPathCompletion(timestamp);
         }
     }
 
@@ -350,7 +362,7 @@ public class Drive implements ISubsystem {
         return Util.deadBand(Util.limit(rotationCorrection * rotationScalar * driveVecNorm, motionPlanner.getMaxRotationSpeed()), 0.01);
     }
 
-    private Translation2d handleDriveVecNorm(Translation2d driveVec, double rotationalInput, Pose2d pose) {
+    private Translation2d handleTrajectoryDriveVectorNorm(Translation2d driveVec, double rotationalInput, Pose2d pose) {
         if (Util.epsilonEquals(driveVec.getNorm(), 0.0)) {
             driveVec = lastTrajectoryVector;
             setClosedLoopVelocityStall(inverseKinematics.updateDriveVectors(driveVec, rotationalInput, pose, false));
@@ -371,10 +383,6 @@ public class Drive implements ISubsystem {
         System.out.println("Path completed in: " + (timestamp - trajectoryStartTime));
         hasFinishedTrajectory = true;
         if (alwaysConfigModules) requireModuleConfig();
-    }
-
-    public void handleVisionUpdate(double timestamp, Pose2d robotPose, double rotationCorrection) {
-
     }
 
     private final Loop loop = new Loop() {

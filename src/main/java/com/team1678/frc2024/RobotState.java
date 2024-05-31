@@ -1,16 +1,16 @@
 package com.team1678.frc2024;
 
-import com.team254.lib.util.MovingAverageTwist2d;
+import com.team1678.lib.geometry.MovingAverageTwist2d;
+import com.team1678.lib.util.Translation2dHelper;
+import com.team1678.lib.util.Twist2dHelper;
 
-import edu.wpi.first.math.geometry.Pose2d;
-import edu.wpi.first.math.geometry.Translation2d;
-import edu.wpi.first.math.geometry.Twist2d;
+import edu.wpi.first.math.geometry.*;
+import edu.wpi.first.math.interpolation.InterpolatingTreeMap;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.smartdashboard.Field2d;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
-import java.util.Map;
 import java.util.Optional;
 
 public class RobotState {
@@ -67,8 +67,8 @@ public class RobotState {
      * 4. Camera-to-target: Measured by the vision system.
      */
     private Optional<Translation2d> initial_field_to_odom_ = Optional.empty();
-    private InterpolatingDoubleTreeMap<InterpolatingDouble, Pose2d> odom_to_vehicle_;
-    private InterpolatingTreeMap<InterpolatingDouble, Translation2d> field_to_odom_;
+    private InterpolatingTreeMap<Double, Pose2d> odom_to_vehicle_;
+    private InterpolatingTreeMap<Double, Translation2d> field_to_odom_;
 
     private Twist2d vehicle_velocity_predicted_;
     private Twist2d vehicle_velocity_measured_;
@@ -80,10 +80,8 @@ public class RobotState {
 
 
     public synchronized void reset(double start_time, Pose2d initial_odom_to_vehicle) {
-        odom_to_vehicle_ = new InterpolatingTreeMap<>(kObservationBufferSize);
-        odom_to_vehicle_.put(new InterpolatingDouble(start_time), initial_odom_to_vehicle);
-        field_to_odom_ = new InterpolatingTreeMap<>(kObservationBufferSize);
-        field_to_odom_.put(new InterpolatingDouble(start_time), getInitialFieldToOdom().getTranslation());
+        odom_to_vehicle_.put(start_time, initial_odom_to_vehicle);
+        field_to_odom_.put(start_time, getInitialFieldToOdom().getTranslation());
         vehicle_velocity_predicted_ = new Twist2d();
         vehicle_velocity_measured_ = new Twist2d();
         vehicle_velocity_measured_filtered_ = new MovingAverageTwist2d(25);
@@ -129,20 +127,20 @@ public class RobotState {
      * to fill in the gaps.
      */
     public synchronized Pose2d getOdomToVehicle(double timestamp) {
-        return odom_to_vehicle_.getInterpolated(new InterpolatingDouble(timestamp));
+        return odom_to_vehicle_.get(timestamp);
     }
 
-    public synchronized Map.Entry<InterpolatingDouble, Pose2d> getLatestOdomToVehicle() {
-        return odom_to_vehicle_.lastEntry();
+    public synchronized Pose2d getLatestOdomToVehicle() {
+        return odom_to_vehicle_.get(Timer.getFPGATimestamp());
     }
 
     public synchronized Pose2d getPredictedOdomToVehicle(double lookahead_time) {
-        return getLatestOdomToVehicle().getValue()
-                .transformBy(Pose2d.exp(vehicle_velocity_predicted_.scaled(lookahead_time)));
+        Twist2d scaledVehicleVelocityPredicted = new Twist2d(vehicle_velocity_predicted_.dx * lookahead_time, vehicle_velocity_predicted_.dy * lookahead_time, vehicle_velocity_predicted_.dtheta * lookahead_time);
+        return getLatestOdomToVehicle().relativeTo(getLatestOdomToVehicle().exp(scaledVehicleVelocityPredicted));
     }
 
     public synchronized void addOdomToVehicleObservation(double timestamp, Pose2d observation) {
-        odom_to_vehicle_.put(new InterpolatingDouble(timestamp), observation);
+        odom_to_vehicle_.put(timestamp, observation);
     }
 
     public synchronized void addOdomObservations(double timestamp, Pose2d odom_to_robot, Twist2d measured_velocity, Twist2d predicted_velocity) {
@@ -179,24 +177,22 @@ public class RobotState {
 
     /**
      * Return Initial Vision Offset for Pure Odometry Visualization Purposes
-     * @return
      */
     public synchronized Pose2d getInitialFieldToOdom() {
-        if (initial_field_to_odom_.isEmpty()) return Pose2d.identity();
-        return Pose2d.fromTranslation(initial_field_to_odom_.get());
+        return initial_field_to_odom_.map(translation2d -> new Pose2d(translation2d, new Rotation2d())).orElseGet(Pose2d::new);
     }
 
     public synchronized Translation2d getFieldToOdom(double timestamp) {
-        if (initial_field_to_odom_.isEmpty()) return Translation2d.identity();
-        return initial_field_to_odom_.get().inverse().translateBy(field_to_odom_.getInterpolated(new InterpolatingDouble(timestamp)));
+        if (initial_field_to_odom_.isEmpty()) return new Translation2d();
+        return initial_field_to_odom_.get().unaryMinus().plus(field_to_odom_.get(timestamp));
     }
 
     public synchronized Translation2d getAbsoluteFieldToOdom(double timestamp) {
-        return field_to_odom_.getInterpolated(new InterpolatingDouble(timestamp));
+        return field_to_odom_.get(timestamp);
     }
 
     public synchronized Translation2d getLatestFieldToOdom() {
-        return getFieldToOdom(field_to_odom_.lastKey().value);
+        return getFieldToOdom(Timer.getFPGATimestamp());
     }
 
     /**
@@ -208,22 +204,20 @@ public class RobotState {
         Pose2d odomToVehicle = getOdomToVehicle(timestamp);
 
         Translation2d fieldToOdom = getFieldToOdom(timestamp);
-        return new Pose2d(fieldToOdom.translateBy(odomToVehicle.getTranslation()), odomToVehicle.getRotation());
+        return new Pose2d(fieldToOdom.plus(odomToVehicle.getTranslation()), odomToVehicle.getRotation());
 
     }
 
     public synchronized Pose2d getFieldToVehicleAbsolute(double timestamp) {
-        var field_to_odom = initial_field_to_odom_.orElse(Translation2d.identity());
-        return Pose2d.fromTranslation(field_to_odom).transformBy(getFieldToVehicle(timestamp));
+        var field_to_odom = initial_field_to_odom_.orElse(new Translation2d());
+        Pose2d fieldToOdomPose = new Pose2d(field_to_odom, new Rotation2d());
+        Transform2d newPoseTransform = new Transform2d(fieldToOdomPose, getFieldToVehicle(timestamp));
+        return fieldToOdomPose.transformBy(newPoseTransform);
     }
 
-    /**d
-     *
-     * @return
-     */
     public synchronized Pose2d getLatestFieldToVehicle() {
-        Pose2d odomToVehicle = getLatestOdomToVehicle().getValue();
-        return new Pose2d(getLatestFieldToOdom().getTranslation().add(odomToVehicle.getTranslation()), odomToVehicle.getRotation());
+        Pose2d odomToVehicle = getLatestOdomToVehicle();
+        return new Pose2d(getLatestFieldToOdom().plus(odomToVehicle.getTranslation()), odomToVehicle.getRotation());
     }
 
 
