@@ -1,6 +1,7 @@
 package com.team254.lib.trajectory.timing;
 
-import com.team254.lib.geometry.Pose2dWithMotion;
+
+import com.team1678.lib.geometry.Pose2dWithMotion;
 
 public class CentripetalAccelerationConstraint implements TimingConstraint<Pose2dWithMotion> {
     final double mMaxCentripetalAccel;
