@@ -1,29 +1,25 @@
 package com.team1678.frc2024.planners;
 
-import java.text.DecimalFormat;
+import java.util.Optional;
 
+import com.choreo.lib.ChoreoTrajectory;
+import com.choreo.lib.ChoreoTrajectoryState;
 import com.team1678.frc2024.Constants;
-import com.team1678.frc2024.RobotState;
 import com.team1678.lib.control.ErrorTracker;
 import com.team1678.lib.control.Lookahead;
-import com.team1678.lib.geometry.Pose2dWithMotion;
 import com.team1678.lib.util.Pose2dHelper;
 import com.team1678.lib.util.Rotation2dHelper;
-import com.team254.lib.trajectory.Trajectory;
-import com.team254.lib.trajectory.TrajectoryIterator;
-import com.team254.lib.trajectory.TrajectorySamplePoint;
-import com.team254.lib.trajectory.timing.TimedState;
-import com.team254.lib.util.CSVWritable;
 import com.team254.lib.util.SynchronousPIDF;
 import com.team254.lib.util.Util;
 import edu.wpi.first.math.geometry.*;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 
-public class DriveMotionPlanner implements CSVWritable {
+public class DriveMotionPlanner {
     private static final double kMaxDx = 0.0127; // m
     private static final double kMaxDy = 0.0127; // m
     private static final double kMaxDTheta = Math.toRadians(1.0);
     private boolean useDefaultCook = true;
+    private double defaultCook = 0.5;
 
     public enum FollowerType {
         PID,
@@ -35,23 +31,21 @@ public class DriveMotionPlanner implements CSVWritable {
     public void setFollowerType(FollowerType type) {
         mFollowerType = type;
     }
-    TrajectoryIterator<TimedState<Pose2dWithMotion>> mCurrentTrajectory;
-    public Trajectory<TimedState<Pose2dWithMotion>> getTrajectory() {
-        return mCurrentTrajectory.trajectory();
-    }
-    public TrajectoryIterator<TimedState<Pose2dWithMotion>> getIterator() {
+    ChoreoTrajectory mCurrentTrajectory;
+    public ChoreoTrajectory getTrajectory() {
         return mCurrentTrajectory;
     }
     public double getRemainingProgress() {
         if (mCurrentTrajectory != null) {
-            return mCurrentTrajectory.getRemainingProgress();
+            return Math.max(0.0, mCurrentTrajectory.getTotalTime() - mSetpoint.timestamp);
         }
         return 0.0;
     }
+
     boolean mIsReversed = false;
     double mLastTime = Double.POSITIVE_INFINITY;
-    public TimedState<Pose2dWithMotion> mLastSetpoint = null;
-    public TimedState<Pose2dWithMotion> mSetpoint = new TimedState<>(Pose2dWithMotion.identity());
+    public ChoreoTrajectoryState mLastSetpoint = null;
+    public ChoreoTrajectoryState mSetpoint;
     Pose2d mError = new Pose2d();
     ErrorTracker mErrorTracker = new ErrorTracker(15 * 100);
     Translation2d mTranslationalError = new Translation2d();
@@ -75,7 +69,7 @@ public class DriveMotionPlanner implements CSVWritable {
         final double kPivotPoint = 0.5;
         final double kEndPoint = 1.0; // 0.8
         final double kMaxSpeed = 1.0;
-        double normalizedProgress = mCurrentTrajectory.getProgress() / mCurrentTrajectoryLength;
+        double normalizedProgress = mLastSetpoint.timestamp / mCurrentTrajectoryLength;
         double scalar = 0.0;
         if (kStartPoint <= normalizedProgress && normalizedProgress <= kEndPoint) {
             if (normalizedProgress <= kPivotPoint) {
@@ -90,18 +84,16 @@ public class DriveMotionPlanner implements CSVWritable {
     public DriveMotionPlanner() {
     }
 
-    public void setTrajectory(final TrajectoryIterator<TimedState<Pose2dWithMotion>> trajectory) {
+    public void setTrajectory(ChoreoTrajectory trajectory) {
         mCurrentTrajectory = trajectory;
-        mSetpoint = trajectory.getState();
-        mLastSetpoint = null;
-        useDefaultCook = true;
-        mSpeedLookahead = new Lookahead(Constants.PurePursuit.kAdaptivePathMinLookaheadDistance, Constants.PurePursuit.kAdaptivePathMaxLookaheadDistance, 0.0, Constants.SwerveConfig.kMaxLinearVelocity);
-        mCurrentTrajectoryLength = mCurrentTrajectory.trajectory().getLastPoint().state().t();
-        for (int i = 0; i < trajectory.trajectory().length(); ++i) {
-            if (trajectory.trajectory().getPoint(i).state().velocity() > Util.kEpsilon) {
+        mSetpoint = trajectory.getInitialState();
+        mCurrentTrajectoryLength = trajectory.getTotalTime();
+        for (ChoreoTrajectoryState state : mCurrentTrajectory.getSamples()) {
+            var velocity = Math.sqrt(Math.pow(state.getChassisSpeeds().vxMetersPerSecond,2) + Math.pow(state.getChassisSpeeds().vyMetersPerSecond,2));
+            if (velocity > Util.kEpsilon) {
                 mIsReversed = false;
                 break;
-            } else if (trajectory.trajectory().getPoint(i).state().velocity() < -Util.kEpsilon) {
+            } else if (velocity < -Util.kEpsilon) {
                 mIsReversed = true;
                 break;
             }
@@ -115,16 +107,6 @@ public class DriveMotionPlanner implements CSVWritable {
         mLastSetpoint = null;
         mOutput = new ChassisSpeeds();
         mLastTime = Double.POSITIVE_INFINITY;
-    }
-
-    @Override
-    public String toCSV() {
-        DecimalFormat fmt = new DecimalFormat("#0.000");
-        String ret = "";
-        ret += fmt.format(mOutput.vxMetersPerSecond + ",");
-        ret += fmt.format(mOutput.vyMetersPerSecond + ",");
-        ret += fmt.format(mOutput.omegaRadiansPerSecond + ",");
-        return ret + mSetpoint.toCSV();
     }
 
     protected ChassisSpeeds updatePIDChassis(ChassisSpeeds chassisSpeeds) {
@@ -146,41 +128,51 @@ public class DriveMotionPlanner implements CSVWritable {
     protected ChassisSpeeds updatePurePursuit(Pose2d current_state) {
         double lookahead_time = Constants.PurePursuit.kPathLookaheadTime;
         final double kLookaheadSearchDt = 0.01;
-        TimedState<Pose2dWithMotion> lookahead_state = mCurrentTrajectory.preview(lookahead_time).state();
-        double actual_lookahead_distance = mSetpoint.state().distance(lookahead_state.state());
-        double adaptive_lookahead_distance = mSpeedLookahead.getLookaheadForSpeed(mSetpoint.velocity());
+
+        ChoreoTrajectoryState lookahead_state = mCurrentTrajectory.sample(lookahead_time);
+        double actual_lookahead_distance = mSetpoint.getPose().minus(lookahead_state.getPose()).getTranslation().getNorm();
+        double adaptive_lookahead_distance = mSpeedLookahead.getLookaheadForSpeed(new Translation2d(mSetpoint.velocityX, mSetpoint.velocityY).getNorm());
+
         //Find the Point on the Trajectory that is Lookahead Distance Away
         while (actual_lookahead_distance < adaptive_lookahead_distance &&
-                mCurrentTrajectory.getRemainingProgress() > lookahead_time) {
+                getRemainingProgress() > lookahead_time) {
             lookahead_time += kLookaheadSearchDt;
-            lookahead_state = mCurrentTrajectory.preview(lookahead_time).state();
-            actual_lookahead_distance = mSetpoint.state().distance(lookahead_state.state());
+            lookahead_state = mCurrentTrajectory.sample(lookahead_time);
+            actual_lookahead_distance = mSetpoint.getPose().minus(lookahead_state.getPose()).getTranslation().getNorm();
         }
 
-        //If the Lookahead Point's Distance is less than the Lookahead Distance transform it so it is the lookahead distance away
+        //If the Lookahead Point's Distance is less than the Lookahead Distance transform it, so it is the lookahead distance away
         if (actual_lookahead_distance < adaptive_lookahead_distance) {
-            lookahead_state = new TimedState<>(new Pose2dWithMotion(lookahead_state.state()
-                    .getPose().transformBy(new Transform2d(new Translation2d(
-                            (mIsReversed ? -1.0 : 1.0) * (Constants.PurePursuit.kPathMinLookaheadDistance -
-                                    actual_lookahead_distance), 0.0), new Rotation2d())), 0.0), lookahead_state.t()
-                    , lookahead_state.velocity(), lookahead_state.acceleration());
+            double xTranslation = (mIsReversed ? -1.0 : 1.0) * (Constants.PurePursuit.kPathMinLookaheadDistance - actual_lookahead_distance);
+            double yTranslation = 0.0;
+            Translation2d lookahead_translation = lookahead_state.getPose().getTranslation().plus(new Translation2d(xTranslation, yTranslation));
+            Rotation2d lookahead_rotation = new Rotation2d();
+
+            lookahead_state = new ChoreoTrajectoryState(
+                    lookahead_state.timestamp,
+                    lookahead_translation.getX(),
+                    lookahead_translation.getY(),
+                    lookahead_state.heading,
+                    lookahead_state.velocityX,
+                    lookahead_state.velocityY,
+                    lookahead_state.angularVelocity
+            );
         }
 
         //Find the vector between robot's current position and the lookahead state
-        Translation2d lookaheadTranslation = lookahead_state.state().getTranslation().minus(current_state.getTranslation());
+        Translation2d lookahead_translation = lookahead_state.getPose().getTranslation().minus(current_state.getTranslation());
 
         //Set the steering direction as the direction of the vector
-        Rotation2d steeringDirection = lookaheadTranslation.getAngle();
+        Rotation2d steeringDirection = lookahead_translation.getAngle();
 
         //Convert from field-relative steering direction to robot-relative
         steeringDirection = steeringDirection.rotateBy(Pose2dHelper.inverse(current_state).getRotation());
 
         //Use the Velocity Feedforward of the Closest Point on the Trajectory
-        double normalizedSpeed = Math.abs(mSetpoint.velocity()) / Constants.SwerveConfig.kMaxLinearVelocity;
+        double normalizedSpeed = Math.abs(new Translation2d(mSetpoint.velocityX, mSetpoint.velocityY).getNorm()) / Constants.SwerveConfig.kMaxLinearVelocity;
 
         //The Default Cook is the minimum speed to use. So if a feedforward speed is less than defaultCook, the robot will drive at the defaultCook speed
-        double defaultCook = 0.5;
-        if(normalizedSpeed > defaultCook || mSetpoint.t() > (mCurrentTrajectoryLength / 2.0)){
+        if(normalizedSpeed > defaultCook || mSetpoint.timestamp > (mCurrentTrajectoryLength / 2.0)){
             useDefaultCook = false;
         }
         if(useDefaultCook){
@@ -190,7 +182,6 @@ public class DriveMotionPlanner implements CSVWritable {
         //Convert the Polar Coordinate (speed, direction) into a Rectangular Coordinate (Vx, Vy) in Robot Frame
         final Translation2d steeringVector = new Translation2d(steeringDirection.getCos() * normalizedSpeed, steeringDirection.getSin() * normalizedSpeed);
         ChassisSpeeds chassisSpeeds = new ChassisSpeeds(steeringVector.getX() * Constants.SwerveConfig.kMaxLinearVelocity, steeringVector.getY() * Constants.SwerveConfig.kMaxLinearVelocity, 0.0);
-
 
         //Use the PD-Controller for To Follow the Time-Parametrized Heading
         final double kThetakP = 3.5;
@@ -211,23 +202,23 @@ public class DriveMotionPlanner implements CSVWritable {
         if (!Double.isFinite(mLastTime)) mLastTime = timestamp;
         mDt = timestamp - mLastTime;
         mLastTime = timestamp;
-        TrajectorySamplePoint<TimedState<Pose2dWithMotion>> sample_point;
+        ChoreoTrajectoryState samplePoint;
         mCurrentState = current_state;
 
         if (isDone()) {
             // Compute error in robot frame
             mPrevHeadingError = mError.getRotation();
-            mError = Pose2dHelper.inverse(current_state).relativeTo(mSetpoint.state().getPose());
+            mError = Pose2dHelper.inverse(current_state).relativeTo(mSetpoint.getPose());
             mErrorTracker.addObservation(mError);
 
             if (mFollowerType == FollowerType.PID) {
-                sample_point = mCurrentTrajectory.advance(mDt);
-                RobotState.getInstance().setDisplaySetpointPose(new Pose2d(RobotState.getInstance().getFieldToOdom(timestamp), new Rotation2d()).relativeTo(sample_point.state().state().getPose()));
-                mSetpoint = sample_point.state();
+                samplePoint = mCurrentTrajectory.sample(mDt);
+                //RobotState.getInstance().setDisplaySetpointPose(new Pose2d(RobotState.getInstance().getFieldToOdom(timestamp), new Rotation2d()).relativeTo(sample_point.state().state().getPose()));
+                mSetpoint = samplePoint;
 
-                final double velocity_m = mSetpoint.velocity();
+                final double velocity_m = new Translation2d(mSetpoint.velocityX, mSetpoint.velocityY).getNorm();
                 // Field relative
-                var course = mSetpoint.state().getCourse();
+                Optional<Rotation2d> course = Optional.of(new Rotation2d(mSetpoint.velocityX, mSetpoint.velocityY));
                 Rotation2d motion_direction = course.orElseGet(Rotation2d::new);
                 // Adjust course by ACTUAL heading rather than planned to decouple heading and translation errors.
                 motion_direction = Rotation2dHelper.inverse(current_state.getRotation()).rotateBy(motion_direction);
@@ -236,7 +227,7 @@ public class DriveMotionPlanner implements CSVWritable {
                         motion_direction.getCos() * velocity_m,
                         motion_direction.getSin() * velocity_m,
                         // Need unit conversion because Pose2dWithMotion heading rate is per unit distance.
-                        velocity_m * mSetpoint.state().getHeadingRate());
+                        velocity_m * mSetpoint.angularVelocity);
                 // PID is in robot frame
                 mOutput = updatePIDChassis(chassis_speeds);
             } else if (mFollowerType == FollowerType.PURE_PURSUIT) {
@@ -256,9 +247,9 @@ public class DriveMotionPlanner implements CSVWritable {
                     searchStepSize /= 10.0;
                     searchDirection *= -1;
                 }
-                sample_point = mCurrentTrajectory.advance(previewQuantity);
-                RobotState.getInstance().setDisplaySetpointPose(new Pose2d(RobotState.getInstance().getFieldToOdom(timestamp), new Rotation2d()).relativeTo(sample_point.state().state().getPose()));
-                mSetpoint = sample_point.state();
+                samplePoint = mCurrentTrajectory.sample(previewQuantity);
+                //RobotState.getInstance().setDisplaySetpointPose(new Pose2d(RobotState.getInstance().getFieldToOdom(timestamp), new Rotation2d()).relativeTo(sample_point.state().state().getPose()));
+                mSetpoint = samplePoint;
                 mOutput = updatePurePursuit(current_state);
             }
         } else {
@@ -269,7 +260,7 @@ public class DriveMotionPlanner implements CSVWritable {
     }
 
     public boolean isDone() {
-        return mCurrentTrajectory == null || !mCurrentTrajectory.isDone();
+        return mCurrentTrajectory == null || !(getRemainingProgress() == 0);
     }
 
     public synchronized Translation2d getTranslationalError() {
@@ -283,10 +274,10 @@ public class DriveMotionPlanner implements CSVWritable {
     }
 
     private double distance(Pose2d current_state, double additional_progress){
-        return Pose2dHelper.distance(mCurrentTrajectory.preview(additional_progress).state().state().getPose(), current_state);
+        return Pose2dHelper.distance(mCurrentTrajectory.sample(additional_progress).getPose(), current_state);
     }
 
-    public synchronized TimedState<Pose2dWithMotion> getSetpoint() {
+    public synchronized ChoreoTrajectoryState getSetpoint() {
         return mSetpoint;
     }
 

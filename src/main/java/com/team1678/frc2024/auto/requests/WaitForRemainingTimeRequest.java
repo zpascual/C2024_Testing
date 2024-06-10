@@ -1,6 +1,6 @@
 package com.team1678.frc2024.auto.requests;
 
-import com.team1678.frc2024.subsystems.requests.Request;
+import com.team1678.frc2024.requests.Request;
 import com.team1678.lib.util.Stopwatch;
 
 public class WaitForRemainingTimeRequest extends Request {

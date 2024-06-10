@@ -33,7 +33,7 @@ import org.littletonrobotics.junction.Logger;
 import java.util.Arrays;
 import java.util.List;
 
-public class Drive implements ISubsystem {
+public class Drive extends Subsystem {
 
     private static Drive instance = null;
     public static Drive getInstance() {
@@ -105,7 +105,7 @@ public class Drive implements ISubsystem {
 
     public double getPlannerRemainingProgress() {
         if (motionPlanner != null && getState() == ControlState.TRAJECTORY) {
-            return motionPlanner.getIterator().getRemainingProgress() / (motionPlanner.getIterator().getProgress() + motionPlanner.getIterator().getRemainingProgress());
+            return motionPlanner.getRemainingProgress();
         }
         return 0.0;
     }

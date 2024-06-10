@@ -4,7 +4,7 @@ import com.ctre.phoenix6.StatusCode;
 import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
 import com.team1678.frc2024.Ports;
-import com.team1678.frc2024.subsystems.ISubsystem;
+import com.team1678.frc2024.subsystems.Subsystem;
 import com.team1678.lib.drivers.CANDevice;
 import com.team1678.lib.drivers.encoders.IEncoder;
 import com.team1678.lib.drivers.encoders.MagEncoder;
@@ -14,7 +14,7 @@ import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.wpilibj.DriverStation;
 
-public abstract class SwerveModule implements ISubsystem {
+public abstract class SwerveModule extends Subsystem {
     protected final IEncoder azmithAbsoluteEncoder;
     protected final int moduleId;
     protected final String moduleName;

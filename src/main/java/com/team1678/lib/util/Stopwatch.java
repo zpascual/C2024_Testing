@@ -1,7 +1,7 @@
 package com.team1678.lib.util;
 
-import com.team1678.frc2024.subsystems.requests.LambdaRequest;
-import com.team1678.frc2024.subsystems.requests.Request;
+import com.team1678.frc2024.requests.LambdaRequest;
+import com.team1678.frc2024.requests.Request;
 import edu.wpi.first.wpilibj.Timer;
 
 public class Stopwatch {

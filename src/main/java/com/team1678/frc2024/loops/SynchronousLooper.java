@@ -6,7 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class SynchronousLooper implements ILooper {
-    private SubsystemManager subsystemManager;
+    private final SubsystemManager subsystemManager;
     private final List<Loop> autoLoops = new ArrayList<>();
     private final List<Loop> teleopLoops = new ArrayList<>();
     private final List<Loop> disabledLoops = new ArrayList<>();
@@ -61,7 +61,28 @@ public class SynchronousLooper implements ILooper {
         disabledLoops.forEach(l -> l.onStart(timestamp));
     }
 
+    private void onEnabledLoop(double timestamp, List <Loop> auxLoops) {
+        subsystemManager.readPeriodicInputs();
+        auxLoops.forEach(l -> l.onLoop(timestamp));
+        subsystemManager.onLoop(timestamp);
+        subsystemManager.writePeriodicOutputs();
+        subsystemManager.outputTelemetry();
+    }
 
+    public void onAutoLoop(double timestamp) {
+        onEnabledLoop(timestamp, autoLoops);
+    }
+
+    public void onTeleopLoop(double timestamp) {
+        onEnabledLoop(timestamp, teleopLoops);
+    }
+
+    public void onDisabledLoop(double timestamp) {
+        subsystemManager.readPeriodicInputs();
+        disabledLoops.forEach(l -> l.onLoop(timestamp));
+        subsystemManager.writePeriodicOutputs();
+        subsystemManager.outputTelemetry();
+    }
 
     private enum EnabledMode {
         AUTO, TELEOP

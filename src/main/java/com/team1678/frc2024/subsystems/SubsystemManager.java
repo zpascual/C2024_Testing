@@ -6,12 +6,12 @@ import com.team1678.frc2024.loops.Loop;
 import java.util.ArrayList;
 import java.util.List;
 
-public class SubsystemManager implements ISubsystem, ILooper, Loop {
+public class SubsystemManager extends Subsystem implements ILooper, Loop {
 
-    private final List<ISubsystem> mAllSubsystems;
+    private final List<Subsystem> mAllSubsystems;
     private final List<Loop> mLoops = new ArrayList<>();
 
-    public SubsystemManager(List<ISubsystem> allSubsystems) {
+    public SubsystemManager(List<Subsystem> allSubsystems) {
         this.mAllSubsystems = allSubsystems;
         allSubsystems.forEach(s -> s.registerLooper(this));
     }
@@ -38,27 +38,27 @@ public class SubsystemManager implements ISubsystem, ILooper, Loop {
 
     @Override
     public void readPeriodicInputs() {
-        mAllSubsystems.forEach(ISubsystem::readPeriodicInputs);
+        mAllSubsystems.forEach(Subsystem::readPeriodicInputs);
     }
 
     @Override
     public void writePeriodicOutputs() {
-        mAllSubsystems.forEach(ISubsystem::writePeriodicOutputs);
+        mAllSubsystems.forEach(Subsystem::writePeriodicOutputs);
     }
 
     @Override
     public void outputTelemetry() {
-        mAllSubsystems.forEach(ISubsystem::outputTelemetry);
+        mAllSubsystems.forEach(Subsystem::outputTelemetry);
     }
 
     @Override
     public void stop() {
-        mAllSubsystems.forEach(ISubsystem::stop);
+        mAllSubsystems.forEach(Subsystem::stop);
     }
 
     @Override
     public void zeroSensors() {
-        mAllSubsystems.forEach(ISubsystem::zeroSensors);
+        mAllSubsystems.forEach(Subsystem::zeroSensors);
     }
 
     @Override

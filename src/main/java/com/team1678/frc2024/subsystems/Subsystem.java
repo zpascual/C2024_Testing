@@ -12,20 +12,28 @@ import com.team1678.frc2024.loops.ILooper;
  * state; the robot code will try to match the two states with actions. Each Subsystem also is responsible for
  * instantiating all member components at the start of the match.
  */
-public interface ISubsystem {
+public abstract class Subsystem {
 
-    void readPeriodicInputs();
+    public void readPeriodicInputs() {
 
-    void writePeriodicOutputs();
+    };
 
-    void outputTelemetry();
+    public void writePeriodicOutputs() {
 
-    void stop();
+    };
 
-    void zeroSensors();
+    public abstract void outputTelemetry();
 
-    void registerLooper(ILooper looper);
+    public abstract void stop();
 
-    boolean hasEmergency = false;
+    public void zeroSensors() {
+
+    };
+
+    public void registerLooper(ILooper looper) {
+
+    };
+
+    public boolean hasEmergency = false;
 
 }
